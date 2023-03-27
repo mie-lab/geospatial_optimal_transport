@@ -7,6 +7,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import mean_squared_error
 
 from augment import *
@@ -30,6 +31,13 @@ def get_folds(nr_samples, nr_folds=10):
     return train_inds, test_inds
 
 
+def renormalize(predictions):
+    if args.model == "mlp":
+        return predictions * std_train[target] + mean_train[target]
+    else:
+        return predictions
+
+
 dataset_target = {
     "plants": "richness_species_vascular",
     "meuse": "zinc",
@@ -37,8 +45,17 @@ dataset_target = {
     "deforestation": "deforestation_quantile",
     "california_housing": "median_house_value",
 }
+model_factory = {
+    "rf": {"class": RandomForestRegressor, "params": {"n_estimators": 100}},
+    "mlp": {
+        "class": MLPRegressor,
+        "params": {"max_iter": 500, "batch_size": 32},
+    },
+}
 FOLDS = 10
 dist_cutoff = None
+
+np.random.seed(42)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -51,11 +68,15 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--out_path", type=str, default="outputs")
     parser.add_argument("-k", "--k_neighbors", type=int, default=5)
     parser.add_argument("--distance_band", action="store_true")
+    parser.add_argument("-m", "--model", type=str, default="rf")
     args = parser.parse_args()
 
     data_path = args.data
     out_path = args.out_path
     nr_neighbors = args.k_neighbors
+    assert args.model in model_factory.keys()
+    MODEL_CLASS = model_factory[args.model]["class"]
+    model_params = model_factory[args.model]["params"]
 
     os.makedirs(out_path, exist_ok=True)
 
@@ -96,33 +117,53 @@ if __name__ == "__main__":
                     len(augmented_train_data) / len(train_set_orig),
                 )
 
-            # baseline model
-            model = RandomForestRegressor(n_estimators=100)
-            model.fit(train_set_orig[feat_cols], train_set_orig[target])
-
-            # train on augmented data
-            model_aug = RandomForestRegressor(n_estimators=100)
-            model_aug.fit(
-                augmented_train_data[feat_cols], augmented_train_data[target]
-            )
-
             # augment the test data as well
             augmented_test_data = augment_data(
                 test_data, data, nr_neighbors, dist_cutoff=dist_cutoff
             )
+
+            # normalization
+            orig_test_targets = test_data[target].values
+            if args.model == "mlp":
+                # normalzie
+                mean_train = train_set_orig[feat_cols + [target]].mean()
+                std_train = train_set_orig[feat_cols + [target]].std()
+                train_set_orig.loc[:, feat_cols + [target]] = (
+                    train_set_orig[feat_cols + [target]] - mean_train
+                ) / std_train
+                augmented_train_data[feat_cols + [target]] = (
+                    augmented_train_data[feat_cols + [target]] - mean_train
+                ) / std_train
+                test_data[feat_cols + [target]] = (
+                    test_data[feat_cols + [target]] - mean_train
+                ) / std_train
+                augmented_test_data[feat_cols + [target]] = (
+                    augmented_test_data[feat_cols + [target]] - mean_train
+                ) / std_train
+
+            # baseline model
+            model = MODEL_CLASS(**model_params)
+            model.fit(train_set_orig[feat_cols], train_set_orig[target])
+
+            # train on augmented data
+            model_aug = MODEL_CLASS(**model_params)
+            model_aug.fit(
+                augmented_train_data[feat_cols], augmented_train_data[target]
+            )
+
             augmented_test_data["weight"] = dist_to_weight(
                 augmented_test_data["dist"]
             )
 
             # # Make predictions with different methods
             # 1)  use basic model and predict basic data
-            pred_basic = model.predict(test_data[feat_cols])
+            pred_basic = renormalize(model.predict(test_data[feat_cols]))
             # 2) use model trained with augmentation and predict basic data
-            pred_trainaug = model_aug.predict(test_data[feat_cols])
+            pred_trainaug = renormalize(model_aug.predict(test_data[feat_cols]))
 
             # 3) use model trained with augmentation and predict augmented data
-            augmented_test_data["prediction"] = model_aug.predict(
-                augmented_test_data[feat_cols]
+            augmented_test_data["prediction"] = renormalize(
+                model_aug.predict(augmented_test_data[feat_cols])
             )
             pred_trainaug_testaug = augmented_test_data.groupby("orig").agg(
                 {"prediction": "mean"}
@@ -139,8 +180,8 @@ if __name__ == "__main__":
             ).apply(weighted_std)
 
             # 4) use basic model and predict augmented data
-            augmented_test_data["prediction"] = model.predict(
-                augmented_test_data[feat_cols]
+            augmented_test_data["prediction"] = renormalize(
+                model.predict(augmented_test_data[feat_cols])
             )
             pred_testaug = augmented_test_data.groupby("orig").agg(
                 {"prediction": "mean"}
@@ -157,7 +198,7 @@ if __name__ == "__main__":
 
             # collect results:
             res_df = pd.DataFrame()
-            res_df["gt"] = test_data[target]
+            res_df["gt"] = orig_test_targets
 
             res_df["pred_basic"] = pred_basic
             res_df["pred_trainaug"] = pred_trainaug
