@@ -44,6 +44,7 @@ dataset_target = {
     "atlantic": "Rate",
     "deforestation": "deforestation_quantile",
     "california_housing": "median_house_value",
+    "car_sharing_stations": "pre_covid_trip_total",
 }
 model_factory = {
     "rf": {"class": RandomForestRegressor, "params": {"n_estimators": 100}},
