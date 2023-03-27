@@ -9,13 +9,7 @@ warnings.filterwarnings("ignore")
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 
-from augment import (
-    augment_by_distance,
-    augment_by_neighbors,
-    get_avg_dist_to_neighbors,
-    augment_by_neighbors_efficient,
-    augment_data,
-)
+from augment import *
 from utils import dist_to_weight, weighted_std, weighted_avg
 
 
@@ -44,6 +38,7 @@ dataset_target = {
     "california_housing": "median_house_value",
 }
 FOLDS = 10
+dist_cutoff = None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -55,6 +50,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("-o", "--out_path", type=str, default="outputs")
     parser.add_argument("-k", "--k_neighbors", type=int, default=5)
+    parser.add_argument("--distance_band", action="store_true")
     args = parser.parse_args()
 
     data_path = args.data
@@ -70,6 +66,11 @@ if __name__ == "__main__":
         target = dataset_target[ds]
         feat_cols = list(data.drop([target, "x", "y"], axis=1).columns)
 
+        # get quantile distance as the cutoff;
+        if args.distance_band:
+            dist_cutoff = quantile_dist_to_nn(data, k_nn=1, quantile=0.9)
+            print("Augmenting with KNN distance band ", round(dist_cutoff, 2))
+
         # start final dataframe
         out_df = []
 
@@ -81,7 +82,10 @@ if __name__ == "__main__":
             test_data = data.iloc[test_inds[fold]]
 
             augmented_train_data = augment_data(
-                train_set_orig, train_set_orig, nr_neighbors
+                train_set_orig,
+                train_set_orig,
+                nr_neighbors,
+                dist_cutoff=dist_cutoff,
             )
 
             # remove duplicates
@@ -103,7 +107,9 @@ if __name__ == "__main__":
             )
 
             # augment the test data as well
-            augmented_test_data = augment_data(test_data, data, nr_neighbors)
+            augmented_test_data = augment_data(
+                test_data, data, nr_neighbors, dist_cutoff=dist_cutoff
+            )
             augmented_test_data["weight"] = dist_to_weight(
                 augmented_test_data["dist"]
             )

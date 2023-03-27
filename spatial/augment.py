@@ -11,6 +11,15 @@ def get_avg_dist_to_neighbors(data, nr_neighbors=3):
     return avg_dist_nn  # avg distance to three nearest neighbors
 
 
+def quantile_dist_to_nn(data, k_nn=1, quantile=0.5):
+    tree = BallTree(data[["x", "y"]], leaf_size=15, metric="euclidean")
+    distances, indices = tree.query(data[["x", "y"]], k=k_nn + 1)
+    # print(distances.shape)
+    # plt.hist(distances[:, k_nn], bins=30)
+    # plt.show()
+    return np.quantile(distances[:, k_nn], quantile)
+
+
 def augment_by_distance(train_set_orig, scale, shifts=[0, 0.35, 0.7]):
     # add other scales
     # for i, scale in enumerate(scales):
@@ -92,7 +101,9 @@ def augment_by_neighbors_efficient(
     return query_data
 
 
-def augment_data(data_to_augment, all_data=None, nr_neighbors=4):
+def augment_data(
+    data_to_augment, all_data=None, nr_neighbors=4, dist_cutoff=None
+):
     # set index to range index -> needed for tree search
     test_data = data_to_augment.reset_index(drop=True).drop(
         ["traintest"], axis=1, errors="ignore"
@@ -119,6 +130,10 @@ def augment_data(data_to_augment, all_data=None, nr_neighbors=4):
         avg_2 = (neighbor_values + test_data) / 2
         avg_2["orig"] = test_data.index
         avg_2["dist"] = distances[:, n + 1]
+        if dist_cutoff is not None:
+            # print(len(avg_2))
+            avg_2 = avg_2[avg_2["dist"] < dist_cutoff]
+            # print("Reducing due to distance cutoff", len(avg_2))
         augmented.append(avg_2)
     augmented = pd.concat(augmented)
     return augmented
