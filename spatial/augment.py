@@ -116,6 +116,7 @@ def augment_data(
 
     test_data["orig"] = test_data.index  # original to the current index
     test_data["dist"] = 0  # the raw sample has zero distance to itself
+    test_data["k_neighbor"] = 0
 
     # query in tree
     tree = BallTree(all_data[["x", "y"]], leaf_size=15, metric="euclidean")
@@ -129,6 +130,7 @@ def augment_data(
         )
         avg_2 = (neighbor_values + test_data) / 2
         avg_2["orig"] = test_data.index
+        avg_2["k_neighbor"] = n + 1
         avg_2["dist"] = distances[:, n + 1]
         if dist_cutoff is not None:
             # print(len(avg_2))

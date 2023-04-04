@@ -87,6 +87,7 @@ if __name__ == "__main__":
         data = pd.read_csv(os.path.join(data_path, f"{ds}.csv"))
         target = dataset_target[ds]
         feat_cols = list(data.drop([target, "x", "y"], axis=1).columns)
+        feat_and_target = feat_cols + [target]
 
         # get quantile distance as the cutoff;
         if args.distance_band:
@@ -94,7 +95,7 @@ if __name__ == "__main__":
             print("Augmenting with KNN distance band ", round(dist_cutoff, 2))
 
         # start final dataframe
-        out_df = []
+        out_df, out_df_augmented = [], []
 
         # split into train and test
         train_inds, test_inds = get_folds(len(data), nr_folds=FOLDS)
@@ -125,21 +126,22 @@ if __name__ == "__main__":
 
             # normalization
             orig_test_targets = test_data[target].values
+            orig_test_targets_aug = augmented_test_data[target].values
             if args.model == "mlp":
                 # normalzie
-                mean_train = train_set_orig[feat_cols + [target]].mean()
-                std_train = train_set_orig[feat_cols + [target]].std()
-                train_set_orig.loc[:, feat_cols + [target]] = (
-                    train_set_orig[feat_cols + [target]] - mean_train
+                mean_train = train_set_orig[feat_and_target].mean()
+                std_train = train_set_orig[feat_and_target].std()
+                train_set_orig.loc[:, feat_and_target] = (
+                    train_set_orig[feat_and_target] - mean_train
                 ) / std_train
-                augmented_train_data[feat_cols + [target]] = (
-                    augmented_train_data[feat_cols + [target]] - mean_train
+                augmented_train_data[feat_and_target] = (
+                    augmented_train_data[feat_and_target] - mean_train
                 ) / std_train
-                test_data[feat_cols + [target]] = (
-                    test_data[feat_cols + [target]] - mean_train
+                test_data[feat_and_target] = (
+                    test_data[feat_and_target] - mean_train
                 ) / std_train
-                augmented_test_data[feat_cols + [target]] = (
-                    augmented_test_data[feat_cols + [target]] - mean_train
+                augmented_test_data[feat_and_target] = (
+                    augmented_test_data[feat_and_target] - mean_train
                 ) / std_train
 
             # baseline model
@@ -163,38 +165,38 @@ if __name__ == "__main__":
             pred_trainaug = renormalize(model_aug.predict(test_data[feat_cols]))
 
             # 3) use model trained with augmentation and predict augmented data
-            augmented_test_data["prediction"] = renormalize(
+            augmented_test_data["prediction_aug"] = renormalize(
                 model_aug.predict(augmented_test_data[feat_cols])
             )
             pred_trainaug_testaug = augmented_test_data.groupby("orig").agg(
-                {"prediction": "mean"}
+                {"prediction_aug": "mean"}
             )
             unc_trainaug_testaug = augmented_test_data.groupby("orig").agg(
-                {"prediction": "std"}
+                {"prediction_aug": "std"}
             )
             # weighted average and uncertainty
             pred_trainaug_testaug_weighted = augmented_test_data.groupby(
                 "orig"
-            ).apply(weighted_avg)
+            ).apply(weighted_avg, pred_col="prediction_aug")
             unc_trainaug_testaug_weighted = augmented_test_data.groupby(
                 "orig"
-            ).apply(weighted_std)
+            ).apply(weighted_std, pred_col="prediction_aug")
 
             # 4) use basic model and predict augmented data
-            augmented_test_data["prediction"] = renormalize(
+            augmented_test_data["prediction_base"] = renormalize(
                 model.predict(augmented_test_data[feat_cols])
             )
             pred_testaug = augmented_test_data.groupby("orig").agg(
-                {"prediction": "mean"}
+                {"prediction_base": "mean"}
             )
             unc_testaug = augmented_test_data.groupby("orig").agg(
-                {"prediction": "std"}
+                {"prediction_base": "std"}
             )
             pred_testaug_weighted = augmented_test_data.groupby("orig").apply(
-                weighted_avg
+                weighted_avg, pred_col="prediction_base"
             )
             unc_testaug_weighted = augmented_test_data.groupby("orig").apply(
-                weighted_std
+                weighted_std, pred_col="prediction_base"
             )
 
             # collect results:
@@ -234,9 +236,25 @@ if __name__ == "__main__":
             res_df["test_inds"] = test_inds[fold]
 
             out_df.append(res_df)
+            # also store the results for the augmented data
+            augmented_test_data["gt"] = orig_test_targets_aug
+            keep_cols = [
+                "gt",
+                "prediction_base",
+                "prediction_aug",
+                "orig",
+                "k_neighbor",
+                "dist",
+            ]
+            out_df_augmented.append(augmented_test_data[keep_cols])
 
         out_df = pd.concat(out_df)
         out_df.to_csv(os.path.join(out_path, ds + "_res.csv"), index=False)
+
+        out_df_augmented = pd.concat(out_df_augmented)
+        out_df_augmented.to_csv(
+            os.path.join(out_path, ds + "_augmented_res.csv"), index=False
+        )
 
         print("RMSE basic", np.sqrt(out_df["MSE_basic"].mean()))
         print(
