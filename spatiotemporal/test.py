@@ -10,19 +10,11 @@ from darts.models import LinearRegressionModel, XGBModel
 from darts.metrics import mae
 from darts.dataprocessing.transformers import MinTReconciliator
 
-from hierarchy import (
-    stations_to_hierarchy,
-    aggregate_bookings,
-    hier_to_darts,
-    add_demand_groups,
-)
-from utils import (
-    get_error_group_level,
-    get_children_hierarchy,
-    create_groups_with_pred,
-)
+from hierarchy_utils import aggregate_bookings, add_demand_groups
+from station_hierarchy import StationHierarchy
+from utils import get_error_group_level
 from visualization import plot_error_evolvement
-from optimal_transport import transport_equal_dist, transport_from_centers
+from optimal_transport import OptimalTransportLoss
 
 in_path_data = "../data/bikes_montreal/test_data.csv"
 in_path_stations = "../data/bikes_montreal/test_stations.csv"
@@ -39,14 +31,15 @@ demand_df = demand_df[demand_df["station_id"] < max_station]
 stations_locations = stations_locations[stations_locations.index < max_station]
 
 # run the preprocessing
-station_groups, hier = stations_to_hierarchy(stations_locations)
+station_hierarchy = StationHierarchy(stations_locations)
 demand_agg = aggregate_bookings(demand_df)
-demand_agg = add_demand_groups(demand_agg, hier)
-darts_hier = hier_to_darts(hier)
+demand_agg = add_demand_groups(demand_agg, station_hierarchy.hier)
 
 # train model
 tourism_series = TimeSeries.from_dataframe(demand_agg)
-tourism_series = tourism_series.with_hierarchy(darts_hier)
+tourism_series = tourism_series.with_hierarchy(
+    station_hierarchy.get_darts_hier()
+)
 train, val = tourism_series[:-8], tourism_series[-8:]
 
 # Model comparison
@@ -76,8 +69,12 @@ for ModelClass, model_name, params in zip(
     else:
         pred = pred_raw
 
+    station_hierarchy.add_pred(pred[0], f"pred_{model_name}_0")
+
     # check errors
-    error_evolvement = get_error_group_level(pred, val, station_groups)
+    error_evolvement = get_error_group_level(
+        pred, val, station_hierarchy.station_groups
+    )
     # add to comparison
     comparison[model_name] = error_evolvement[:, 1]
     plot_error_evolvement(
@@ -86,7 +83,7 @@ for ModelClass, model_name, params in zip(
     current_mean_error = np.mean(error_evolvement[:, 1])
     if current_mean_error < best_mean_error:
         best_mean_error = current_mean_error
-        best_pred = pred.copy()
+        best_model = model_name
 
 comparison.index = error_evolvement[:, 0]
 
@@ -95,22 +92,10 @@ plt.figure(figsize=(6, 6))
 comparison.plot()
 plt.savefig(os.path.join(out_path, "comparison.png"))
 
-# continue with best pred
-pred = best_pred
-step_ahead = 0
+# Do optimal transport stuff with best pred
+gt_col, pred_col = ("gt_0", f"pred_{best_model}_0")
+station_hierarchy.add_pred(val[0], gt_col)
 
-# TODO: maybe disentangle, make prediction column per step ahead, etc
-groups_with_pred = create_groups_with_pred(
-    pred, val, step_ahead, station_groups
-)
-
-# generate groups with pred TODO: put in function -> group_with_pred not needed
-base_station = groups_with_pred.loc[
-    ~groups_with_pred.index.str.contains("Group"), ["gt", "start_x", "start_y"]
-]
-base_station_coords = base_station[["start_x", "start_y"]].values.astype(float)
-base_station["dist"] = base_station["gt"] / base_station["gt"].sum()
-base_station_dist = base_station["dist"].values
-
-transport_from_centers(groups_with_pred, base_station, hier)
-transport_equal_dist(groups_with_pred, base_station, hier)
+transport_loss = OptimalTransportLoss(station_hierarchy)
+transport_loss.transport_from_centers(gt_col, pred_col)
+transport_loss.transport_equal_dist(gt_col, pred_col)

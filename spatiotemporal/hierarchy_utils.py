@@ -85,63 +85,11 @@ def test_hierarchy(bookings_agg, hierarchy, test_node=800):
     assert all(bookings_agg[test_node] == summed)
 
 
-def stations_to_hierarchy(stations_locations):
-    assert stations_locations.index.name == "station_id"
-
+def cluster_agglomerative(station_locations):
     # cluster the stations
     clustering = AgglomerativeClustering(distance_threshold=0, n_clusters=None)
-    clustering.fit(stations_locations[["start_x", "start_y"]])
-
-    # convert into dictionary as a basis for the new station-group df
-    station_groups = stations_locations.reset_index()
-    station_groups["nr_stations"] = 1
-    station_groups["group"] = (
-        station_groups["station_id"].astype(int).astype(str)
-    )
-    station_groups_dict = (
-        station_groups.drop(["station_id"], axis=1).swapaxes(1, 0).to_dict()
-    )
-
-    linkage = clustering.children_
-    nr_samples = len(stations_locations)
-
-    hier = {}
-
-    for j, pair in enumerate(linkage):
-        node1, node2 = (
-            station_groups_dict[pair[0]],
-            station_groups_dict[pair[1]],
-        )
-
-        # init new node
-        new_node = {}
-        # compute running average of the coordinates
-        new_nr_stations = node1["nr_stations"] + node2["nr_stations"]
-        new_node["nr_stations"] = new_nr_stations
-        new_node["start_x"] = (
-            node1["start_x"] * node1["nr_stations"]
-            + node2["start_x"] * node2["nr_stations"]
-        ) / new_nr_stations
-        new_node["start_y"] = (
-            node1["start_y"] * node1["nr_stations"]
-            + node2["start_y"] * node2["nr_stations"]
-        ) / new_nr_stations
-
-        # add group name
-        new_node["group"] = "Group_" + str(j)
-
-        # add to overall dictionary
-        station_groups_dict[j + nr_samples] = new_node
-
-        # add to darts hierarchy
-        #         darts_hier[node1["group"]] = new_node["group"]
-        #         darts_hier[node2["group"]] = new_node["group"]
-        hier[new_node["group"]] = [node1["group"], node2["group"]]
-
-    station_groups = (
-        pd.DataFrame(station_groups_dict).swapaxes(1, 0).set_index("group")
-    )
-    return station_groups, hier
+    clustering.fit(station_locations[["start_x", "start_y"]])
+    return clustering.children_
 
 
 def add_demand_groups(demand_agg, hier):
@@ -155,11 +103,3 @@ def add_demand_groups(demand_agg, hier):
     for key, pair in hier.items():
         demand_agg[key] = demand_agg[pair[0]] + demand_agg[pair[1]]
     return demand_agg
-
-
-def hier_to_darts(hierarchy: dict):
-    darts_hier = {}
-    for key, pair in hierarchy.items():
-        for p in pair:
-            darts_hier[p] = key
-    return darts_hier
