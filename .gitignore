@@ -7,9 +7,11 @@ __pycache__/
 *.so
 *.code-workspace
 .DS_Store
+.vscode
 
 # project specific
 deprecated.py
+data/
 outputs/
 figures/
 *.ipynb
