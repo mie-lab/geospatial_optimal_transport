@@ -6,9 +6,21 @@ from hierarchy_utils import cluster_agglomerative
 
 
 class StationHierarchy:
-    def __init__(
+    def __init__(self):
+        print("Init object either from file or from stations_locations")
+
+    def init_from_file(self, load_path):
+        self.station_groups = pd.read_csv(
+            os.path.join(load_path, "station_groups.csv"), index_col="group"
+        )
+        with open(
+            os.path.join(load_path, "station_hierarchy.json"), "r"
+        ) as infile:
+            self.hier = json.load(infile)
+
+    def init_from_station_locations(
         self, stations_locations, clustering_method=cluster_agglomerative
-    ) -> None:
+    ):
         assert stations_locations.index.name == "station_id"
 
         linkage = clustering_method(stations_locations)
@@ -101,19 +113,11 @@ class StationHierarchy:
         return self.base_station
 
     def save(self, save_path):
+        os.makedirs(save_path, exist_ok=True)
         self.station_groups.to_csv(
             os.path.join(save_path, "station_groups.csv")
         )
         with open(
-            os.path.join(save_path, "station_hierarchy.csv"), "w"
+            os.path.join(save_path, "station_hierarchy.json"), "w"
         ) as outfile:
             json.dump(self.hier, outfile)
-
-    def load(self, load_path):
-        self.station_groups = pd.read_csv(
-            os.path.join(load_path, "station_groups.csv")
-        )
-        with open(
-            os.path.join(load_path, "station_hierarchy.csv"), "r"
-        ) as infile:
-            json.dump(self.hier, infile)
