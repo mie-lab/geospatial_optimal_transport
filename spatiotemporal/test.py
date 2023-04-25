@@ -80,7 +80,10 @@ for model_name in [
     else:
         pred = pred_raw
 
-    station_hierarchy.add_pred(pred[0], f"pred_{model_name}_0")
+    for steps_ahead in range(len(val)):
+        station_hierarchy.add_pred(
+            pred[steps_ahead], f"pred_{model_name}_{steps_ahead}"
+        )
 
     # check errors
     error_evolvement = get_error_group_level(
@@ -105,7 +108,7 @@ comparison.plot()
 plt.savefig(os.path.join(out_path, "comparison.png"))
 
 # Do optimal transport stuff with best pred
-gt_col, pred_col = ("gt_0", f"pred_{best_model}_0")
-station_hierarchy.add_pred(val[0], gt_col)
+for steps_ahead in range(len(val)):
+    station_hierarchy.add_pred(val[steps_ahead], f"gt_{steps_ahead}")
 
 station_hierarchy.save(os.path.join("outputs", "test1"))

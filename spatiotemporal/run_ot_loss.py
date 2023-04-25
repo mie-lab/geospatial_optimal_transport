@@ -2,7 +2,7 @@ from station_hierarchy import StationHierarchy
 from optimal_transport import OptimalTransportLoss
 
 load_path = "outputs/test1"
-gt_col, pred_col = "gt_0", "pred_linear_ind_no_0"
+gt_col, pred_col = "gt_0", "pred_linear_multi_no_0"
 
 station_hierarchy = StationHierarchy()
 station_hierarchy.init_from_file(load_path)
