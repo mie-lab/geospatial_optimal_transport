@@ -50,13 +50,13 @@ class StationHierarchy:
             # compute running average of the coordinates
             new_nr_stations = node1["nr_stations"] + node2["nr_stations"]
             new_node["nr_stations"] = new_nr_stations
-            new_node["start_x"] = (
-                node1["start_x"] * node1["nr_stations"]
-                + node2["start_x"] * node2["nr_stations"]
+            new_node["x"] = (
+                node1["x"] * node1["nr_stations"]
+                + node2["x"] * node2["nr_stations"]
             ) / new_nr_stations
-            new_node["start_y"] = (
-                node1["start_y"] * node1["nr_stations"]
-                + node2["start_y"] * node2["nr_stations"]
+            new_node["y"] = (
+                node1["y"] * node1["nr_stations"]
+                + node2["y"] * node2["nr_stations"]
             ) / new_nr_stations
 
             # add group name
@@ -105,7 +105,7 @@ class StationHierarchy:
         # excluding groups
         self.base_station = self.station_groups.loc[
             ~self.station_groups.index.str.contains("Group"),
-            [gt_col, "start_x", "start_y"],
+            [gt_col, "x", "y"],
         ]
         self.base_station["dist"] = (
             self.base_station[gt_col] / self.base_station[gt_col].sum()

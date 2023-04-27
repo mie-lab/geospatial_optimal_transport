@@ -13,8 +13,8 @@ def test_hierarchy(hier, demand_agg, station_groups, stations_locations):
     print(
         "distance of stations",
         np.linalg.norm(
-            station_groups.loc[child_1, ["start_x", "start_y"]].values
-            - station_groups.loc[child_2, ["start_x", "start_y"]].values
+            station_groups.loc[child_1, ["x", "y"]].values
+            - station_groups.loc[child_2, ["x", "y"]].values
         ),
     )
     collect_stations = []

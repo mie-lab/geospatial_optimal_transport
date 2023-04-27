@@ -13,7 +13,7 @@ def compare_was(res, iters=300, sinkhorn_kwargs={}):
         rand_rows = res.sample(n_samples)
         a = rand_rows["pred_linear_multi_no_0"].values
         b = rand_rows["gt_0"].values
-        test_cdist = rand_rows[["start_x", "start_y"]].values
+        test_cdist = rand_rows[["x", "y"]].values
         test_cdist = cdist(test_cdist, test_cdist)
         # normalize to values between 0 and 1
         test_cdist = test_cdist / np.max(test_cdist)
@@ -36,7 +36,7 @@ def compare_was(res, iters=300, sinkhorn_kwargs={}):
 def check_pred_gt(res, sinkhorn_kwargs={}):
     res_stations = res[~res.index.str.contains("Group")]
 
-    test_cdist = res_stations[["start_x", "start_y"]].values
+    test_cdist = res_stations[["x", "y"]].values
     test_cdist = cdist(test_cdist, test_cdist)
     test_cdist_normed = test_cdist / np.max(test_cdist)
 

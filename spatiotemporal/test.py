@@ -7,37 +7,51 @@ from darts import TimeSeries, concatenate
 from darts.models import LinearRegressionModel, XGBModel
 from darts.dataprocessing.transformers import MinTReconciliator
 
-from hierarchy_utils import aggregate_bookings, add_demand_groups
+from hierarchy_utils import add_demand_groups
 from station_hierarchy import StationHierarchy
 from utils import get_error_group_level
 from visualization import plot_error_evolvement
+import warnings
 
-in_path_data = "../data/bikes_montreal/test_data.csv"
+warnings.filterwarnings("ignore")
+
+in_path_data = "../data/bikes_montreal/test_pickup.csv"
 in_path_stations = "../data/bikes_montreal/test_stations.csv"
 out_path = "outputs"
+TRAIN_CUTOFF = -100
+
 os.makedirs(out_path, exist_ok=True)
 
 demand_df = pd.read_csv(in_path_data)
 stations_locations = pd.read_csv(in_path_stations).set_index("station_id")
-demand_df["start_time"] = pd.to_datetime(demand_df["start_time"])
+demand_df["timeslot"] = pd.to_datetime(demand_df["timeslot"])
 
-# make even smaller excerpt
-max_station = 50
-demand_df = demand_df[demand_df["station_id"] < max_station]
-stations_locations = stations_locations[stations_locations.index < max_station]
+# create matrix
+demand_agg = demand_df.pivot(
+    index="timeslot", columns="station_id", values="count"
+).fillna(0)
 
-# run the preprocessing
+
+# OPTIONAL: make even smaller excerpt
+stations_included = stations_locations[:50].index
+stations_locations = stations_locations[
+    stations_locations.index.isin(stations_included)
+]
+# reduce demand matrix shape
+print(demand_agg.shape)
+demand_agg = demand_agg[stations_included]
+print(demand_agg.shape)
+
 station_hierarchy = StationHierarchy()
 station_hierarchy.init_from_station_locations(stations_locations)
-demand_agg = aggregate_bookings(demand_df)
 demand_agg = add_demand_groups(demand_agg, station_hierarchy.hier)
 
 # train model
-tourism_series = TimeSeries.from_dataframe(demand_agg)
+tourism_series = TimeSeries.from_dataframe(demand_agg, freq="1h")
 tourism_series = tourism_series.with_hierarchy(
     station_hierarchy.get_darts_hier()
 )
-train, val = tourism_series[:-8], tourism_series[-8:]
+train, val = tourism_series[:TRAIN_CUTOFF], tourism_series[TRAIN_CUTOFF:]
 
 # Model comparison
 # For now, only compare linear and xgb in different configurations
@@ -50,11 +64,11 @@ best_mean_error = np.inf
 for model_name in [
     "linear_multi_no",
     "linear_ind_no",
-    "linear_ind_reconcile",
-    "xgb_multi_no",
-    "xgb_multi_reconcile",
-    "xgb_ind_no",
-    "xgb_ind_reconcile",
+    # "linear_ind_reconcile",
+    # "xgb_multi_no",
+    # "xgb_multi_reconcile",
+    # "xgb_ind_no",
+    # "xgb_ind_reconcile",
 ]:
     # get parameters
     model_class_name, multi_vs_ind, do_reconcile = model_name.split("_")

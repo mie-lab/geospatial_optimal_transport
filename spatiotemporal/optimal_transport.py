@@ -13,9 +13,7 @@ class OptimalTransportLoss:
     def transport_from_centers(self, gt_col, pred_col):
         # create base stations
         base_station = self.station_hierarchy.create_base_station(gt_col)
-        base_station_coords = base_station[
-            ["start_x", "start_y"]
-        ].values.astype(float)
+        base_station_coords = base_station[["x", "y"]].values.astype(float)
         base_station_dist = base_station["dist"].values
 
         print("OPTION 1")
@@ -28,14 +26,14 @@ class OptimalTransportLoss:
             #     print(level_stations)
             #     print(level, level_stations)
             level_df = self.station_hierarchy.station_groups.loc[
-                level_stations, ["start_x", "start_y", pred_col]
+                level_stations, ["x", "y", pred_col]
             ]
 
             level_df["dist"] = level_df[pred_col] / level_df[pred_col].sum()
 
             # compute pairwise distances between groups and the stations
             pairwise_distances = cdist(
-                level_df[["start_x", "start_y"]].values.astype(float),
+                level_df[["x", "y"]].values.astype(float),
                 base_station_coords,
             )
 
@@ -49,9 +47,7 @@ class OptimalTransportLoss:
 
     def transport_equal_dist(self, gt_col, pred_col):
         base_station = self.station_hierarchy.create_base_station(gt_col)
-        base_station_coords = base_station[
-            ["start_x", "start_y"]
-        ].values.astype(float)
+        base_station_coords = base_station[["x", "y"]].values.astype(float)
         base_station_dist = base_station["dist"].values
 
         print("OPTION 2")

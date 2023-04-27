@@ -3,14 +3,14 @@ import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 
 
-def aggregate_bookings(demand_df, agg_by="day"):
+def aggregate_bookings_deprecated(demand_df, agg_by="day"):
     if agg_by == "day":
-        demand_df[agg_by] = demand_df["start_time"].dt.date
+        demand_df[agg_by] = demand_df["timeslot"].dt.date
     elif agg_by == "hour":
         demand_df[agg_by] = (
-            demand_df["start_time"].dt.date.astype(str)
+            demand_df["timeslot"].dt.date.astype(str)
             + "-"
-            + demand_df["start_time"].dt.hour.astype(str)
+            + demand_df["timeslot"].dt.hour.astype(str)
         )
     else:
         #     demand_df["second_hour"] = demand_df["hour"] // 2
@@ -24,8 +24,8 @@ def aggregate_bookings(demand_df, agg_by="day"):
     bookings_agg.rename(
         {"duration_sec": "demand", agg_by: "timeslot"}, axis=1, inplace=True
     )
-    bookings_agg = bookings_agg.pivot(
-        index="timeslot", columns="station_id", values="demand"
+    bookings_agg = demand_df.pivot(
+        index="timeslot", columns="station_id", values="count"
     ).fillna(0)
     return bookings_agg
 
@@ -33,7 +33,7 @@ def aggregate_bookings(demand_df, agg_by="day"):
 def clustering_algorithm(stations_locations):
     stations_locations.sort_values("station_id")
     clustering = AgglomerativeClustering(distance_threshold=0, n_clusters=None)
-    clustering.fit(stations_locations[["start_x", "start_y"]])
+    clustering.fit(stations_locations[["x", "y"]])
     return clustering.children_
 
 
@@ -88,7 +88,7 @@ def test_hierarchy(bookings_agg, hierarchy, test_node=800):
 def cluster_agglomerative(station_locations):
     # cluster the stations
     clustering = AgglomerativeClustering(distance_threshold=0, n_clusters=None)
-    clustering.fit(station_locations[["start_x", "start_y"]])
+    clustering.fit(station_locations[["x", "y"]])
     return clustering.children_
 
 
@@ -101,5 +101,7 @@ def add_demand_groups(demand_agg, hier):
     demand_agg.index = pd.to_datetime(demand_agg.index)
 
     for key, pair in hier.items():
-        demand_agg[key] = demand_agg[pair[0]] + demand_agg[pair[1]]
+        demand_agg[key] = (
+            demand_agg[pair[0]].values + demand_agg[pair[1]].values
+        )
     return demand_agg
