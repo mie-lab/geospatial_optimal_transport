@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -17,112 +18,155 @@ warnings.filterwarnings("ignore")
 
 in_path_data = "../data/bikes_montreal/test_pickup.csv"
 in_path_stations = "../data/bikes_montreal/test_stations.csv"
-out_path = "outputs"
-TRAIN_CUTOFF = -100
+out_path = "outputs/test"
+TRAIN_CUTOFF = 0.9
+TEST_SAMPLES = 50  # number of time points where we start a prediction
+STEPS_AHEAD = 3
 
-os.makedirs(out_path, exist_ok=True)
-
-demand_df = pd.read_csv(in_path_data)
-stations_locations = pd.read_csv(in_path_stations).set_index("station_id")
-demand_df["timeslot"] = pd.to_datetime(demand_df["timeslot"])
-
-# create matrix
-demand_agg = demand_df.pivot(
-    index="timeslot", columns="station_id", values="count"
-).fillna(0)
-
-
-# OPTIONAL: make even smaller excerpt
-stations_included = stations_locations[:50].index
-stations_locations = stations_locations[
-    stations_locations.index.isin(stations_included)
-]
-# reduce demand matrix shape
-print(demand_agg.shape)
-demand_agg = demand_agg[stations_included]
-print(demand_agg.shape)
-
-station_hierarchy = StationHierarchy()
-station_hierarchy.init_from_station_locations(stations_locations)
-demand_agg = add_demand_groups(demand_agg, station_hierarchy.hier)
-
-# train model
-tourism_series = TimeSeries.from_dataframe(demand_agg, freq="1h")
-tourism_series = tourism_series.with_hierarchy(
-    station_hierarchy.get_darts_hier()
-)
-train, val = tourism_series[:TRAIN_CUTOFF], tourism_series[TRAIN_CUTOFF:]
-
-# Model comparison
-# For now, only compare linear and xgb in different configurations
 model_class_dict = {"linear": LinearRegressionModel, "xgb": XGBModel}
 params = {"lags": 5}
 
-comparison = pd.DataFrame()
-best_mean_error = np.inf
-# for ModelClass, model_name, params in zip(
-for model_name in [
-    "linear_multi_no",
-    "linear_ind_no",
-    # "linear_ind_reconcile",
-    # "xgb_multi_no",
-    # "xgb_multi_reconcile",
-    # "xgb_ind_no",
-    # "xgb_ind_reconcile",
-]:
-    # get parameters
-    model_class_name, multi_vs_ind, do_reconcile = model_name.split("_")
-    ModelClass = model_class_dict[model_class_name]
-    print(model_class_name, multi_vs_ind, do_reconcile)
+os.makedirs(out_path, exist_ok=True)
 
-    if multi_vs_ind == "multi":
-        model = ModelClass(**params)
-        model.fit(train)
-        pred_raw = model.predict(n=len(val))
-    else:  # independent forecast
-        preds_collect = []
-        for component in tourism_series.components:
+
+def clean_single_pred(pred):
+    result_as_df = pred.pd_dataframe().swapaxes(1, 0).reset_index()
+    result_as_df.rename(
+        columns={c: i for i, c in enumerate(result_as_df.columns[1:])},
+        inplace=True,
+    )
+    result_as_df = pd.melt(result_as_df, id_vars=["component"]).rename(
+        {"component": "group", "value": "pred", "timeslot": "steps_ahead"},
+        axis=1,
+    )
+    return result_as_df
+
+
+def load_data(in_path_data, in_path_stations):
+    demand_df = pd.read_csv(in_path_data)
+    stations_locations = pd.read_csv(in_path_stations).set_index("station_id")
+    demand_df["timeslot"] = pd.to_datetime(demand_df["timeslot"])
+
+    # create matrix
+    demand_agg = demand_df.pivot(
+        index="timeslot", columns="station_id", values="count"
+    ).fillna(0)
+    print("Demand matrix", demand_agg.shape)
+    # OPTIONAL: make even smaller excerpt
+    # stations_included = stations_locations.sample(50).index
+    # stations_locations = stations_locations[
+    #     stations_locations.index.isin(stations_included)
+    # ]
+    # # reduce demand matrix shape
+    # demand_agg = demand_agg[stations_included]
+    # print(demand_agg.shape)
+    return demand_agg, stations_locations
+
+
+def test_models(
+    demand_agg, stations_locations, out_path, models_to_test=["linear_multi_no"]
+):
+    station_hierarchy = StationHierarchy()
+    station_hierarchy.init_from_station_locations(stations_locations)
+    demand_agg = add_demand_groups(demand_agg, station_hierarchy.hier)
+
+    # initialize time series with hierarchy
+    shared_demand_series = TimeSeries.from_dataframe(demand_agg, freq="1h")
+    shared_demand_series = shared_demand_series.with_hierarchy(
+        station_hierarchy.get_darts_hier()
+    )
+    # split train and val
+    train_cutoff = int(TRAIN_CUTOFF * len(demand_agg))
+    train = shared_demand_series[:train_cutoff]
+
+    # select TEST_SAMPLES random time points during val time
+    assert TEST_SAMPLES < len(shared_demand_series) - train_cutoff
+    random_val_samples = np.random.choice(
+        np.arange(train_cutoff, len(shared_demand_series)),
+        TEST_SAMPLES,
+        replace=False,
+    )
+
+    # Add gt
+    gt_res_dfs = []
+    for val_sample in random_val_samples:
+        gt_steps_ahead = shared_demand_series[
+            val_sample : val_sample + STEPS_AHEAD
+        ]
+        gt_as_df = clean_single_pred(gt_steps_ahead)
+        gt_as_df["val_sample_ind"] = val_sample - train_cutoff
+        gt_res_dfs.append(gt_as_df)
+    gt_res_dfs = pd.concat(gt_res_dfs).reset_index(drop=True)
+    gt_res_dfs.to_csv(os.path.join(out_path, "gt.csv"), index=False)
+
+    # Get predictions for each model and save them
+    for model_name in models_to_test:
+        tic = time.time()
+
+        # get parameters
+        model_class_name, multi_vs_ind, do_reconcile = model_name.split("_")
+        ModelClass = model_class_dict[model_class_name]
+        print("Train and test:", model_class_name, multi_vs_ind, do_reconcile)
+
+        # fit model
+        if multi_vs_ind == "multi":
             model = ModelClass(**params)
-            model.fit(train[component])
-            preds_collect.append(model.predict(n=len(val)))
-        pred_raw = concatenate(preds_collect, axis="component")
+            model.fit(train)
+        else:  # independent forecast
+            fitted_models = []
+            for component in shared_demand_series.components:
+                model = ModelClass(**params)
+                model.fit(train[component])
+                fitted_models.append(model)
 
-    if do_reconcile == "reconcile":
-        reconciliator = MinTReconciliator(method="wls_val")
-        reconciliator.fit(train)
-        pred = reconciliator.transform(pred_raw)
-    else:
-        pred = pred_raw
+        model_res_dfs = []
+        for val_sample in random_val_samples:
+            if multi_vs_ind == "multi":
+                pred_raw = model.predict(
+                    n=STEPS_AHEAD, series=shared_demand_series[:val_sample]
+                )
+            else:
+                # if the models were fitted independently, collect the results
+                preds_collect = []
+                for fitted_model, component in zip(
+                    fitted_models, shared_demand_series.components
+                ):
+                    preds_collect.append(
+                        fitted_model.predict(
+                            n=STEPS_AHEAD,
+                            series=shared_demand_series[component][:val_sample],
+                        )
+                    )
+                pred_raw = concatenate(preds_collect, axis="component")
 
-    for steps_ahead in range(len(val)):
-        station_hierarchy.add_pred(
-            pred[steps_ahead], f"pred_{model_name}_{steps_ahead}"
+            # potentially reconcile them
+            if do_reconcile == "reconcile":
+                reconciliator = MinTReconciliator(method="wls_val")
+                reconciliator.fit(train)
+                pred = reconciliator.transform(pred_raw)
+            else:
+                pred = pred_raw
+
+            # transform to flat df
+            result_as_df = clean_single_pred(pred)
+            # add info about val sample
+            result_as_df["val_sample_ind"] = val_sample - train_cutoff
+            model_res_dfs.append(result_as_df)
+
+        model_res_dfs = pd.concat(model_res_dfs)
+        model_res_dfs.to_csv(
+            os.path.join(out_path, f"{model_name}.csv"), index=False
         )
+        print(time.time() - tic)
+    # save the station hierarchy
+    station_hierarchy.save(out_path)
 
-    # check errors
-    error_evolvement = get_error_group_level(
-        pred, val, station_hierarchy.station_groups
+
+if __name__ == "__main__":
+    demand_agg, stations_locations = load_data(in_path_data, in_path_stations)
+    test_models(
+        demand_agg,
+        stations_locations,
+        out_path,
+        models_to_test=["linear_multi_no", "linear_ind_no"],
     )
-    # add to comparison
-    comparison[model_name] = error_evolvement[:, 1]
-    plot_error_evolvement(
-        error_evolvement, os.path.join(out_path, f"errors_{model_name}.png")
-    )
-    current_mean_error = np.mean(error_evolvement[:, 1])
-    print(model_class_name, "- mean error:", current_mean_error)
-    if current_mean_error < best_mean_error:
-        best_mean_error = current_mean_error
-        best_model = model_name
-
-comparison.index = error_evolvement[:, 0]
-
-comparison.to_csv(os.path.join(out_path, "model_comparison.csv"))
-plt.figure(figsize=(6, 6))
-comparison.plot()
-plt.savefig(os.path.join(out_path, "comparison.png"))
-
-# Do optimal transport stuff with best pred
-for steps_ahead in range(len(val)):
-    station_hierarchy.add_pred(val[steps_ahead], f"gt_{steps_ahead}")
-
-station_hierarchy.save(os.path.join("outputs", "test1"))
