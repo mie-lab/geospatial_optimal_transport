@@ -6,7 +6,7 @@ import argparse
 import matplotlib.pyplot as plt
 
 from darts import TimeSeries, concatenate
-from darts.models import LinearRegressionModel, XGBModel
+from darts.models import LinearRegressionModel, XGBModel, NHiTSModel, Croston
 from darts.dataprocessing.transformers import MinTReconciliator
 
 from hierarchy_utils import add_demand_groups
@@ -21,8 +21,15 @@ TRAIN_CUTOFF = 0.9
 TEST_SAMPLES = 50  # number of time points where we start a prediction
 STEPS_AHEAD = 3
 
-model_class_dict = {"linear": LinearRegressionModel, "xgb": XGBModel}
-params = {"lags": 5}
+model_class_dict = {
+    "linear": (LinearRegressionModel, {"lags": 5}),
+    "xgb": (XGBModel, {"lags": 5}),
+    "nhits": (
+        NHiTSModel,
+        {"input_chunk_length": 5, "output_chunk_length": 3, "n_epochs": 3},
+    ),
+    "croston": (Croston, {}),
+}
 
 np.random.seed(42)
 
@@ -103,7 +110,7 @@ def test_models(
 
         # get parameters
         model_class_name, multi_vs_ind, do_reconcile = model_name.split("_")
-        ModelClass = model_class_dict[model_class_name]
+        ModelClass, params = model_class_dict[model_class_name]
         print("Train and test:", model_class_name, multi_vs_ind, do_reconcile)
 
         # fit model
@@ -191,5 +198,5 @@ if __name__ == "__main__":
         demand_agg,
         stations_locations,
         out_path,
-        models_to_test=["linear_multi_no", "linear_ind_no"],
+        models_to_test=["nhits_multi_no", "linear_multi_no"],
     )
