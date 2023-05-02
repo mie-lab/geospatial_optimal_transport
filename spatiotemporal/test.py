@@ -29,14 +29,14 @@ params = {"lags": 5}
 os.makedirs(out_path, exist_ok=True)
 
 
-def clean_single_pred(pred):
+def clean_single_pred(pred, pred_or_gt="pred"):
     result_as_df = pred.pd_dataframe().swapaxes(1, 0).reset_index()
     result_as_df.rename(
         columns={c: i for i, c in enumerate(result_as_df.columns[1:])},
         inplace=True,
     )
     result_as_df = pd.melt(result_as_df, id_vars=["component"]).rename(
-        {"component": "group", "value": "pred", "timeslot": "steps_ahead"},
+        {"component": "group", "value": pred_or_gt, "timeslot": "steps_ahead"},
         axis=1,
     )
     return result_as_df
@@ -80,9 +80,9 @@ def test_models(
     train = shared_demand_series[:train_cutoff]
 
     # select TEST_SAMPLES random time points during val time
-    assert TEST_SAMPLES < len(shared_demand_series) - train_cutoff
+    assert TEST_SAMPLES < len(shared_demand_series) - train_cutoff - STEPS_AHEAD
     random_val_samples = np.random.choice(
-        np.arange(train_cutoff, len(shared_demand_series)),
+        np.arange(train_cutoff, len(shared_demand_series) - STEPS_AHEAD),
         TEST_SAMPLES,
         replace=False,
     )
@@ -93,7 +93,7 @@ def test_models(
         gt_steps_ahead = shared_demand_series[
             val_sample : val_sample + STEPS_AHEAD
         ]
-        gt_as_df = clean_single_pred(gt_steps_ahead)
+        gt_as_df = clean_single_pred(gt_steps_ahead, pred_or_gt="gt")
         gt_as_df["val_sample_ind"] = val_sample - train_cutoff
         gt_res_dfs.append(gt_as_df)
     gt_res_dfs = pd.concat(gt_res_dfs).reset_index(drop=True)
@@ -157,7 +157,7 @@ def test_models(
         model_res_dfs.to_csv(
             os.path.join(out_path, f"{model_name}.csv"), index=False
         )
-        print(time.time() - tic)
+        print("Finished, runtime:", round(time.time() - tic, 2))
     # save the station hierarchy
     station_hierarchy.save(out_path)
 
