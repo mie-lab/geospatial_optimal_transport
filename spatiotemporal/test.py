@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import time
 import numpy as np
+import argparse
 import matplotlib.pyplot as plt
 
 from darts import TimeSeries, concatenate
@@ -16,9 +17,6 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-in_path_data = "../data/bikes_montreal/test_pickup.csv"
-in_path_stations = "../data/bikes_montreal/test_stations.csv"
-out_path = "outputs/test"
 TRAIN_CUTOFF = 0.9
 TEST_SAMPLES = 50  # number of time points where we start a prediction
 STEPS_AHEAD = 3
@@ -26,7 +24,7 @@ STEPS_AHEAD = 3
 model_class_dict = {"linear": LinearRegressionModel, "xgb": XGBModel}
 params = {"lags": 5}
 
-os.makedirs(out_path, exist_ok=True)
+np.random.seed(42)
 
 
 def clean_single_pred(pred, pred_or_gt="pred"):
@@ -163,6 +161,31 @@ def test_models(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-d",
+        "--data_path",
+        type=str,
+        default="../data/bikes_montreal/test_pickup.csv",
+    )
+    parser.add_argument(
+        "-s",
+        "--station_path",
+        type=str,
+        default="../data/bikes_montreal/test_stations.csv",
+    )
+    parser.add_argument(
+        "-o",
+        "--out_path",
+        type=str,
+        default="outputs/test",
+    )
+    args = parser.parse_args()
+    in_path_data = args.data_path
+    in_path_stations = args.station_path
+    out_path = args.out_path
+    os.makedirs(out_path, exist_ok=True)
+
     demand_agg, stations_locations = load_data(in_path_data, in_path_stations)
     test_models(
         demand_agg,
