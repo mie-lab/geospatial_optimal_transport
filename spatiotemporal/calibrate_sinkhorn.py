@@ -9,10 +9,14 @@ from sinkhorn_loss import sinkhorn_loss_from_numpy
 def compare_was(res, iters=300, sinkhorn_kwargs={}):
     torch_res, emd_res = [], []
     for _ in range(iters):
-        n_samples = np.random.randint(5, 40, 1)
+        n_samples = 5  # np.random.randint(5, 40, 1)
         rand_rows = res.sample(n_samples)
-        a = rand_rows["pred_linear_multi_no_0"].values
-        b = rand_rows["gt_0"].values
+        a = np.clip(rand_rows["pred"].values, 0, None)
+        if np.all(a == 0):
+            a = np.ones(len(a))
+        b = rand_rows["gt"].values
+        if np.all(b == 0):
+            b = np.ones(len(b))
         test_cdist = rand_rows[["x", "y"]].values
         test_cdist = cdist(test_cdist, test_cdist)
         # normalize to values between 0 and 1
@@ -21,7 +25,12 @@ def compare_was(res, iters=300, sinkhorn_kwargs={}):
         b = b / np.sum(b)
 
         torch_res.append(
-            sinkhorn_loss_from_numpy(a, b, test_cdist, sinkhorn_kwargs)
+            sinkhorn_loss_from_numpy(
+                np.expand_dims(a, 0),
+                np.expand_dims(b, 0),
+                test_cdist,
+                sinkhorn_kwargs,
+            )
         )
         was = wasserstein.EMD()
         emd_res.append(was(a, b, test_cdist))
@@ -66,5 +75,17 @@ def check_pred_gt(res, sinkhorn_kwargs={}):
 if __name__ == "__main__":
     import pandas as pd
 
-    res = pd.read_csv("outputs/test1/station_groups.csv", index_col="group")
-    compare_was(res)
+    in_path = "outputs/test/"
+    station_groups = pd.read_csv(in_path + "station_groups.csv")
+    res_gt = pd.read_csv(in_path + "gt.csv")
+    res_pred = pd.read_csv(in_path + "linear_multi_no.csv")
+    together = res_pred.merge(
+        res_gt,
+        left_on=["group", "steps_ahead", "val_sample_ind"],
+        right_on=["group", "steps_ahead", "val_sample_ind"],
+        how="left",
+    )
+    together = together.merge(
+        station_groups, how="left", left_on="group", right_on="group"
+    )
+    compare_was(together)

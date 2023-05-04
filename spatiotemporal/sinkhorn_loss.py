@@ -4,8 +4,27 @@ import numpy as np
 
 
 class SinkhornLoss:
-    def __init__(self, C, n_elements, blur=0.5, **sinkhorn_kwargs):
+    def __init__(self, C, normalize_c=True, blur=0.5, **sinkhorn_kwargs):
+        if isinstance(C, np.ndarray):
+            C = torch.from_numpy(C)
+        # normalize to values betwen 0 and 1
+        if normalize_c:
+            C = C / torch.sum(C)
+        if C.dim() != 3:
+            if C.dim() != 2:
+                raise ValueError("cost matrix C must have 2 or 3 dimensions")
+            C = C.unsqueeze(0)
+
+        # cost matrics and locs both need a static representation and are
+        # modified later to match the batch size
         self.cost_matrix = C
+        self.cost_matrix_original = self.cost_matrix.clone()
+        self.dummy_locs = torch.tensor(
+            [[[i] for i in range(C.size()[-1])]]
+        ).float()
+        self.dummy_locs_orig = self.dummy_locs.clone()
+
+        # sinkhorn loss
         self.loss_object = geomloss.SamplesLoss(
             loss="sinkhorn",
             cost=self.get_cost,
@@ -14,44 +33,62 @@ class SinkhornLoss:
             blur=blur,
             **sinkhorn_kwargs,
         )
-        self.dummy_locs = torch.tensor(
-            [[[i] for i in range(n_elements)]]
-        ).float()
 
     def get_cost(self, a, b):
         return self.cost_matrix
 
     def __call__(self, a, b):
-        # expand batch dim
+        # Adapt cost matrix size to the batch size
         batch_size = a.size()[0]
-        if batch_size != 1:
-            dummy_locs = self.dummy_locs.repeat(batch_size)
+        if self.cost_matrix.size()[0] != batch_size:
+            self.cost_matrix = self.cost_matrix_original.repeat(
+                (batch_size, 1, 1)
+            )
+            self.dummy_locs = self.dummy_locs_orig.repeat((batch_size, 1, 1))
+
+        # check if we predicted several steps ahead
+        steps_ahead = a.size()[1]
+        if a.dim() > 2 and steps_ahead > 1:
+            result = torch.empty((steps_ahead, batch_size))
+            for i in range(steps_ahead):
+                result[i] = self.loss_object(
+                    a[:, i], self.dummy_locs, b[:, i], self.dummy_locs
+                )
+            loss = torch.mean(result, dim=0)
         else:
-            dummy_locs = self.dummy_locs
-        return self.loss_object(a, dummy_locs, b, dummy_locs).item()
+            loss = self.loss_object(a, self.dummy_locs, b, self.dummy_locs)
+        return torch.sum(loss)
 
 
-def sinkhorn_loss_from_numpy(a, b, cost_matrix_numpy, sinkhorn_kwargs={}):
-    nr_samples_here = len(a)
+def sinkhorn_loss_from_numpy(a, b, cost_matrix, sinkhorn_kwargs={}):
+    batch_size = len(a)
 
-    a = torch.tensor([a.tolist()]).float()
+    a = torch.tensor(a.tolist()).float()
     a = a / torch.sum(a)
-    b = torch.tensor([b.tolist()]).float()
+    b = torch.tensor(b.tolist()).float()
     b = b / torch.sum(b)
-    cost_matrix_tensor = torch.tensor([cost_matrix_numpy])
-    loss = SinkhornLoss(cost_matrix_tensor, nr_samples_here, **sinkhorn_kwargs)
+    # cost_matrix = torch.tensor([cost_matrix])
+    # # Testing for the case where multiple steps ahead are predicted
+    # a = a.unsqueeze(1).repeat(1, 3, 1)
+    # b = b.unsqueeze(1).repeat(1, 3, 1)
+    # print("Before initializing", cost_matrix.shape, a.size(), b.size())
+    loss = SinkhornLoss(cost_matrix, **sinkhorn_kwargs)
     return loss(a, b)
 
 
 if __name__ == "__main__":
-    test_cdist = [
-        [0.0, 0.9166617229649182, 0.8011636143804466, 1.0],
-        [0.9166617229649182, 0.0, 0.2901671214052399, 0.5131642591866252],
-        [0.8011636143804466, 0.2901671214052399, 0.0, 0.28166962442054133],
-        [1.0, 0.5131642591866252, 0.28166962442054133, 0.0],
-    ]
+    test_cdist = np.array(
+        [
+            [0.0, 0.9166617229649182, 0.8011636143804466, 1.0],
+            [0.9166617229649182, 0.0, 0.2901671214052399, 0.5131642591866252],
+            [0.8011636143804466, 0.2901671214052399, 0.0, 0.28166962442054133],
+            [1.0, 0.5131642591866252, 0.28166962442054133, 0.0],
+        ]
+    )
     print(
         sinkhorn_loss_from_numpy(
-            np.array([1, 3, 2, 4]), np.array([1, 2, 3, 4]), test_cdist
+            np.array([[1, 3, 2, 4], [1, 3, 2, 4]]),
+            np.array([[1, 2, 3, 4], [1, 2, 3, 4]]),
+            test_cdist,
         )
     )
