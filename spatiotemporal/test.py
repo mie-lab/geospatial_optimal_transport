@@ -6,30 +6,22 @@ import argparse
 import matplotlib.pyplot as plt
 
 from darts import TimeSeries, concatenate
-from darts.models import LinearRegressionModel, XGBModel, NHiTSModel, Croston
 from darts.dataprocessing.transformers import MinTReconciliator
 
 from hierarchy_utils import add_demand_groups
 from station_hierarchy import StationHierarchy
 from utils import get_error_group_level
 from visualization import plot_error_evolvement
+from config import (
+    STEPS_AHEAD,
+    TRAIN_CUTOFF,
+    TEST_SAMPLES,
+    MAX_RENTALS,
+    model_class_dict,
+)
 import warnings
 
 warnings.filterwarnings("ignore")
-
-TRAIN_CUTOFF = 0.9
-TEST_SAMPLES = 50  # number of time points where we start a prediction
-STEPS_AHEAD = 3
-
-model_class_dict = {
-    "linear": (LinearRegressionModel, {"lags": 5}),
-    "xgb": (XGBModel, {"lags": 5}),
-    "nhits": (
-        NHiTSModel,
-        {"input_chunk_length": 5, "output_chunk_length": 3, "n_epochs": 3},
-    ),
-    "croston": (Croston, {}),
-}
 
 np.random.seed(42)
 
@@ -44,19 +36,23 @@ def clean_single_pred(pred, pred_or_gt="pred"):
         {"component": "group", "value": pred_or_gt, "timeslot": "steps_ahead"},
         axis=1,
     )
+    result_as_df[pred_or_gt].clip(0, MAX_RENTALS, inplace=True)
     return result_as_df
 
 
-def load_data(in_path_data, in_path_stations):
+def load_data(in_path_data, in_path_stations, pivot=False):
     demand_df = pd.read_csv(in_path_data)
     stations_locations = pd.read_csv(in_path_stations).set_index("station_id")
     demand_df["timeslot"] = pd.to_datetime(demand_df["timeslot"])
 
     # create matrix
-    demand_agg = demand_df.pivot(
-        index="timeslot", columns="station_id", values="count"
-    ).fillna(0)
-    print("Demand matrix", demand_agg.shape)
+    if pivot:
+        demand_df = demand_df.pivot(
+            index="timeslot", columns="station_id", values="count"
+        ).fillna(0)
+    else:
+        demand_df.set_index("timeslot", inplace=True)
+    print("Demand matrix", demand_df.shape)
     # OPTIONAL: make even smaller excerpt
     # stations_included = stations_locations.sample(50).index
     # stations_locations = stations_locations[
@@ -65,23 +61,14 @@ def load_data(in_path_data, in_path_stations):
     # # reduce demand matrix shape
     # demand_agg = demand_agg[stations_included]
     # print(demand_agg.shape)
-    return demand_agg, stations_locations
+    return demand_df, stations_locations
 
 
 def test_models(
-    demand_agg, stations_locations, out_path, models_to_test=["linear_multi_no"]
+    shared_demand_series, out_path, models_to_test=["linear_multi_no"]
 ):
-    station_hierarchy = StationHierarchy()
-    station_hierarchy.init_from_station_locations(stations_locations)
-    demand_agg = add_demand_groups(demand_agg, station_hierarchy.hier)
-
-    # initialize time series with hierarchy
-    shared_demand_series = TimeSeries.from_dataframe(demand_agg, freq="1h")
-    shared_demand_series = shared_demand_series.with_hierarchy(
-        station_hierarchy.get_darts_hier()
-    )
     # split train and val
-    train_cutoff = int(TRAIN_CUTOFF * len(demand_agg))
+    train_cutoff = int(TRAIN_CUTOFF * len(shared_demand_series))
     train = shared_demand_series[:train_cutoff]
 
     # select TEST_SAMPLES random time points during val time
@@ -163,8 +150,6 @@ def test_models(
             os.path.join(out_path, f"{model_name}.csv"), index=False
         )
         print("Finished, runtime:", round(time.time() - tic, 2))
-    # save the station hierarchy
-    station_hierarchy.save(out_path)
 
 
 if __name__ == "__main__":
@@ -173,13 +158,13 @@ if __name__ == "__main__":
         "-d",
         "--data_path",
         type=str,
-        default="../data/bikes_montreal/test_pickup.csv",
+        default="../data/bikes_montreal/tune_pickup.csv",
     )
     parser.add_argument(
         "-s",
         "--station_path",
         type=str,
-        default="../data/bikes_montreal/test_stations.csv",
+        default="../data/bikes_montreal/tune_stations.csv",
     )
     parser.add_argument(
         "-o",
@@ -187,16 +172,38 @@ if __name__ == "__main__":
         type=str,
         default="outputs/test",
     )
+    parser.add_argument("-m", "--model", default="linear_multi_no")
+    parser.add_argument("-x", "--hierarchy", default=0, type=int)
     args = parser.parse_args()
     in_path_data = args.data_path
     in_path_stations = args.station_path
     out_path = args.out_path
     os.makedirs(out_path, exist_ok=True)
 
+    # TODO: set pivot argument of load_data
     demand_agg, stations_locations = load_data(in_path_data, in_path_stations)
-    test_models(
-        demand_agg,
-        stations_locations,
-        out_path,
-        models_to_test=["nhits_multi_no", "linear_multi_no"],
-    )
+
+    # construct hierarchy
+    if args.hierarchy:
+        station_hierarchy = StationHierarchy()
+        station_hierarchy.init_from_station_locations(stations_locations)
+        demand_agg = add_demand_groups(demand_agg, station_hierarchy.hier)
+
+        # initialize time series with hierarchy
+        shared_demand_series = TimeSeries.from_dataframe(
+            demand_agg,
+            freq="1h",
+            hierarchy=station_hierarchy.get_darts_hier(),
+            fillna_value=0,
+        )
+    else:
+        shared_demand_series = TimeSeries.from_dataframe(
+            demand_agg, freq="1h", fillna_value=0
+        )
+
+    # Run model comparison
+    test_models(shared_demand_series, out_path, models_to_test=[args.model])
+
+    if args.hierarchy:
+        # save the station hierarchy
+        station_hierarchy.save(out_path)
