@@ -7,6 +7,10 @@ import matplotlib.pyplot as plt
 
 from darts import TimeSeries, concatenate
 from darts.dataprocessing.transformers import MinTReconciliator
+from darts.utils.timeseries_generation import (
+    datetime_attribute_timeseries as dt_attr,
+)
+from darts.dataprocessing.transformers import Scaler
 
 from hierarchy_utils import add_demand_groups
 from station_hierarchy import StationHierarchy
@@ -64,6 +68,21 @@ def load_data(in_path_data, in_path_stations, pivot=False):
     return demand_df, stations_locations
 
 
+def add_covariates(time_series):
+    # make dt attributes and stack
+    day = dt_attr(time_series, attribute="day")
+    weekday = dt_attr(time_series, attribute="weekday")
+    covariates = day.stack(weekday)
+    month = dt_attr(time_series, attribute="month")
+    covariates = covariates.stack(month)
+    hour = dt_attr(time_series, attribute="hour")
+    covariates = covariates.stack(hour)
+    # scale
+    scaler_dt = Scaler()
+    scaled_covariates = scaler_dt.fit_transform(covariates)
+    return scaled_covariates
+
+
 def test_models(
     shared_demand_series, out_path, models_to_test=["linear_multi_no"]
 ):
@@ -90,6 +109,10 @@ def test_models(
         gt_res_dfs.append(gt_as_df)
     gt_res_dfs = pd.concat(gt_res_dfs).reset_index(drop=True)
     gt_res_dfs.to_csv(os.path.join(out_path, "gt.csv"), index=False)
+
+    # # get past covariates
+    # covariates = add_covariates(shared_demand_series)
+    # train_covariates = covariates[:train_cutoff]
 
     # Get predictions for each model and save them
     for model_name in models_to_test:
@@ -202,7 +225,12 @@ if __name__ == "__main__":
         )
 
     # Run model comparison
-    test_models(shared_demand_series, out_path, models_to_test=[args.model])
+    if args.model == "all":
+        models = [k + "_multi_no" for k in model_class_dict.keys()]
+        print("Testing models", models)
+    else:
+        model = [args.model]
+    test_models(shared_demand_series, out_path, models_to_test=models)
 
     if args.hierarchy:
         # save the station hierarchy

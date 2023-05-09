@@ -18,6 +18,7 @@ model_class_dict = {
         {"lags": [-1, -2, -3, -4, -5, -24, -128]},
     ),
     "xgb-5": (XGBModel, {"lags": 5}),
+    "xgb-24": (XGBModel, {"lags": 24}),
     "xgb-lags": (XGBModel, {"lags": [-1, -2, -3, -4, -5, -24, -128]}),
     "nhits-50e-5i": (
         NHiTSModel,
@@ -25,7 +26,11 @@ model_class_dict = {
     ),
     "nhits-100e-5i": (
         NHiTSModel,
-        {"input_chunk_length": 5, "output_chunk_length": 3, "n_epochs": 50},
+        {"input_chunk_length": 5, "output_chunk_length": 3, "n_epochs": 100},
+    ),
+    "nhits-50e-24i-12o": (
+        NHiTSModel,
+        {"input_chunk_length": 24, "output_chunk_length": 12, "n_epochs": 50},
     ),
     "lightgbm-5": (LightGBMModel, {"lags": 5}),
     "croston": (Croston, {}),
