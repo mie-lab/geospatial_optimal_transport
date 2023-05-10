@@ -78,7 +78,6 @@ class ModelWrapper:
             ModelClass = NHiTSModel
             model_kwargs = {
                 "input_chunk_length": self.model_args["lags"],
-                "output_chunk_length": self.model_args["output_chunk_length"],
                 "n_epochs": self.model_args["n_epochs"],
                 "num_stacks": self.model_args["num_stacks"],
             }
@@ -86,7 +85,6 @@ class ModelWrapper:
             ModelClass = LightGBMModel
             model_kwargs = {
                 "lags": self.model_args["lags"],
-                "output_chunk_length": self.model_args["output_chunk_length"],
             }
         elif model_class == "xgb":
             ModelClass = XGBModel
@@ -99,6 +97,9 @@ class ModelWrapper:
             model_kwargs["lags_past_covariates"] = self.model_args[
                 "lags_past_covariates"
             ]
+        model_kwargs["output_chunk_length"] = self.model_args[
+            "output_chunk_length"
+        ]
 
         # initialize
         self.model = ModelClass(**model_kwargs)

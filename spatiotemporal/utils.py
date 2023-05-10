@@ -27,12 +27,12 @@ def argument_parsing():
     parser.add_argument("--multi_vs_ind", default="multi", type=str)
     parser.add_argument("-r", "--reconcile", default=0, type=int)
     parser.add_argument("-x", "--hierarchy", default=0, type=int)
-    parser.add_argument("-l", "--lags", default=5, type=int)
-    parser.add_argument("--output_chunk_length", default=1, type=int)
+    parser.add_argument("-l", "--lags", default=24, type=int)
+    parser.add_argument("--output_chunk_length", default=3, type=int)
     parser.add_argument("--n_epochs", default=50, type=int)
     parser.add_argument("--num_stacks", default=3, type=int)
     # set to 0 for not using past covariates
-    parser.add_argument("--lags_past_covariates", default=0, type=int)
+    parser.add_argument("--lags_past_covariates", default=1, type=int)
     args = parser.parse_args()
     if args.reconcile > 0:
         assert args.hierarchy != 0

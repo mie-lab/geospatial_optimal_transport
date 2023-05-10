@@ -51,12 +51,14 @@ if __name__ == "__main__":
     ).fillna(0)
     demand_per_station = demand_pivoted.sum()
     stations["demand"] = demand_per_station
+    # drop the ones without demand during that time
+    stations.dropna(inplace=True)
 
     # potentially find representative stations
     # IF not found yet:
     # find_representative_stations(stations)
     # IF already selected the most representative stations for tuning
-    BEST_TUNE_STATIONS = [379, 365, 74, 380, 378]
+    BEST_TUNE_STATIONS = [185, 425, 156, 179, 443]
     station_subset = stations.iloc[BEST_TUNE_STATIONS]
     print(
         "Mean and Median",
