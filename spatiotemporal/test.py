@@ -97,11 +97,14 @@ def test_models(
     gt_res_dfs = pd.concat(gt_res_dfs).reset_index(drop=True)
     gt_res_dfs.to_csv(os.path.join(out_path, "gt.csv"), index=False)
 
-    # # get past covariates
+    # get past covariates
+    cov_lag = (
+        kwargs["lags_past_covariates"] if model != "nhits" else kwargs["lags"]
+    )
     covariate_wrapper = CovariateWrapper(
         shared_demand_series,
         train_cutoff,
-        lags_past_covariates=kwargs["lags_past_covariates"],
+        lags_past_covariates=cov_lag,
         dt_covariates=True,
     )
 
