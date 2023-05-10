@@ -7,15 +7,11 @@ import matplotlib.pyplot as plt
 
 from darts import TimeSeries, concatenate
 from darts.dataprocessing.transformers import MinTReconciliator
-from darts.utils.timeseries_generation import (
-    datetime_attribute_timeseries as dt_attr,
-)
-from darts.dataprocessing.transformers import Scaler
 
+from model_wrapper import ModelWrapper, CovariateWrapper
 from hierarchy_utils import add_demand_groups
 from station_hierarchy import StationHierarchy
-from utils import get_error_group_level
-from visualization import plot_error_evolvement
+from utils import argument_parsing, construct_name
 from config import (
     STEPS_AHEAD,
     TRAIN_CUTOFF,
@@ -68,23 +64,14 @@ def load_data(in_path_data, in_path_stations, pivot=False):
     return demand_df, stations_locations
 
 
-def add_covariates(time_series):
-    # make dt attributes and stack
-    day = dt_attr(time_series, attribute="day")
-    weekday = dt_attr(time_series, attribute="weekday")
-    covariates = day.stack(weekday)
-    month = dt_attr(time_series, attribute="month")
-    covariates = covariates.stack(month)
-    hour = dt_attr(time_series, attribute="hour")
-    covariates = covariates.stack(hour)
-    # scale
-    scaler_dt = Scaler()
-    scaled_covariates = scaler_dt.fit_transform(covariates)
-    return scaled_covariates
-
-
 def test_models(
-    shared_demand_series, out_path, models_to_test=["linear_multi_no"]
+    shared_demand_series,
+    out_path,
+    multi_vs_ind="multi",
+    model="linear",
+    reconcile=0,
+    model_out_name="test_model",
+    **kwargs,
 ):
     # split train and val
     train_cutoff = int(TRAIN_CUTOFF * len(shared_demand_series))
@@ -111,93 +98,75 @@ def test_models(
     gt_res_dfs.to_csv(os.path.join(out_path, "gt.csv"), index=False)
 
     # # get past covariates
-    # covariates = add_covariates(shared_demand_series)
-    # train_covariates = covariates[:train_cutoff]
+    covariate_wrapper = CovariateWrapper(
+        shared_demand_series,
+        train_cutoff,
+        lags_past_covariates=kwargs["lags_past_covariates"],
+        dt_covariates=True,
+    )
 
     # Get predictions for each model and save them
-    for model_name in models_to_test:
-        tic = time.time()
+    # for model_name in [model_class]:
+    tic = time.time()
 
-        # get parameters
-        model_class_name, multi_vs_ind, do_reconcile = model_name.split("_")
-        ModelClass, params = model_class_dict[model_class_name]
-        print("Train and test:", model_class_name, multi_vs_ind, do_reconcile)
+    # fit model
+    if multi_vs_ind == "multi":
+        regr = ModelWrapper(model, covariate_wrapper, **kwargs)
+        regr.fit(train)
+    else:  # independent forecast
+        fitted_models = []
+        for component in shared_demand_series.components:
+            regr = ModelWrapper(model, covariate_wrapper, **kwargs)
+            regr.fit(train[component])
+            fitted_models.append(regr)
 
-        # fit model
+    # predict
+    model_res_dfs = []
+    for val_sample in random_val_samples:
         if multi_vs_ind == "multi":
-            model = ModelClass(**params)
-            model.fit(train)
-        else:  # independent forecast
-            fitted_models = []
-            for component in shared_demand_series.components:
-                model = ModelClass(**params)
-                model.fit(train[component])
-                fitted_models.append(model)
-
-        model_res_dfs = []
-        for val_sample in random_val_samples:
-            if multi_vs_ind == "multi":
-                pred_raw = model.predict(
-                    n=STEPS_AHEAD, series=shared_demand_series[:val_sample]
-                )
-            else:
-                # if the models were fitted independently, collect the results
-                preds_collect = []
-                for fitted_model, component in zip(
-                    fitted_models, shared_demand_series.components
-                ):
-                    preds_collect.append(
-                        fitted_model.predict(
-                            n=STEPS_AHEAD,
-                            series=shared_demand_series[component][:val_sample],
-                        )
+            pred_raw = regr.predict(
+                n=STEPS_AHEAD,
+                series=shared_demand_series[:val_sample],
+                val_index=val_sample,
+            )
+        else:
+            # if the models were fitted independently, collect the results
+            preds_collect = []
+            for fitted_model, component in zip(
+                fitted_models, shared_demand_series.components
+            ):
+                preds_collect.append(
+                    fitted_model.predict(
+                        n=STEPS_AHEAD,
+                        series=shared_demand_series[component][:val_sample],
+                        val_index=val_sample,
                     )
-                pred_raw = concatenate(preds_collect, axis="component")
+                )
+            pred_raw = concatenate(preds_collect, axis="component")
 
-            # potentially reconcile them
-            if do_reconcile == "reconcile":
-                reconciliator = MinTReconciliator(method="wls_val")
-                reconciliator.fit(train)
-                pred = reconciliator.transform(pred_raw)
-            else:
-                pred = pred_raw
+        # potentially reconcile them
+        if reconcile:
+            reconciliator = MinTReconciliator(method="wls_val")
+            reconciliator.fit(train)
+            pred = reconciliator.transform(pred_raw)
+        else:
+            pred = pred_raw
 
-            # transform to flat df
-            result_as_df = clean_single_pred(pred)
-            # add info about val sample
-            result_as_df["val_sample_ind"] = val_sample - train_cutoff
-            model_res_dfs.append(result_as_df)
+        # transform to flat df
+        result_as_df = clean_single_pred(pred)
+        # add info about val sample
+        result_as_df["val_sample_ind"] = val_sample - train_cutoff
+        model_res_dfs.append(result_as_df)
 
-        model_res_dfs = pd.concat(model_res_dfs)
-        model_res_dfs.to_csv(
-            os.path.join(out_path, f"{model_name}.csv"), index=False
-        )
-        print("Finished, runtime:", round(time.time() - tic, 2))
+    model_res_dfs = pd.concat(model_res_dfs)
+    model_res_dfs.to_csv(
+        os.path.join(out_path, f"{model_out_name}.csv"), index=False
+    )
+    print("Finished, runtime:", round(time.time() - tic, 2))
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-d",
-        "--data_path",
-        type=str,
-        default="../data/bikes_montreal/tune_pickup.csv",
-    )
-    parser.add_argument(
-        "-s",
-        "--station_path",
-        type=str,
-        default="../data/bikes_montreal/tune_stations.csv",
-    )
-    parser.add_argument(
-        "-o",
-        "--out_path",
-        type=str,
-        default="outputs/test",
-    )
-    parser.add_argument("-m", "--model", default="linear_multi_no")
-    parser.add_argument("-x", "--hierarchy", default=0, type=int)
-    args = parser.parse_args()
+    args = argument_parsing()
     in_path_data = args.data_path
     in_path_stations = args.station_path
     out_path = args.out_path
@@ -225,12 +194,12 @@ if __name__ == "__main__":
         )
 
     # Run model comparison
-    if args.model == "all":
-        models = [k + "_multi_no" for k in model_class_dict.keys()]
-        print("Testing models", models)
-    else:
-        model = [args.model]
-    test_models(shared_demand_series, out_path, models_to_test=models)
+    test_models(
+        shared_demand_series,
+        out_path,
+        model_out_name=construct_name(args),
+        **vars(args),
+    )
 
     if args.hierarchy:
         # save the station hierarchy
