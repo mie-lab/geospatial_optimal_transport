@@ -178,6 +178,11 @@ if __name__ == "__main__":
     # construct hierarchy
     if args.hierarchy:
         station_hierarchy = StationHierarchy()
+        if "0" in demand_agg.columns:
+            demand_agg.drop("0", axis=1, inplace=True)
+            stations_locations = stations_locations[
+                stations_locations.index != 0
+            ]
         station_hierarchy.init_from_station_locations(stations_locations)
         demand_agg = add_demand_groups(demand_agg, station_hierarchy.hier)
 
