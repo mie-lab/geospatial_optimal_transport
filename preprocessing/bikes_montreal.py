@@ -79,7 +79,7 @@ def deprecated_derive_stations(demand_df):
 
 def make_test_excerpt(demand_df, stations, reset_station_ids=False):
     demand_df.sort_values("timeslot", inplace=True)
-    excerpt = demand_df[:500000]
+    excerpt = demand_df[demand_df["timeslot"] < "2015-01-01"]
     # reduce to occuring stations
     occurring_ids = excerpt["station_id"].unique()
     stations_pruned = stations[stations["station_id"].isin(occurring_ids)]
@@ -300,6 +300,11 @@ if __name__ == "__main__":
     station_df.to_csv("data/bikes_montreal/stations.csv", index=False)
     to_csv_td(pickup, "data/bikes_montreal/pickup.csv")
     to_csv_td(dropoff, "data/bikes_montreal/dropoff.csv")
+
+    # # In order to only make the excerpt
+    # pickup = pd.read_csv("data/bikes_montreal/pickup.csv")
+    # dropoff = pd.read_csv("data/bikes_montreal/dropoff.csv")
+    # station_df = pd.read_csv("data/bikes_montreal/stations.csv")
 
     excerpt_pickup, stations_pruned = make_test_excerpt(
         pickup, station_df, reset_station_ids=False
