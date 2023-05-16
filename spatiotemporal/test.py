@@ -44,15 +44,6 @@ def load_data(in_path_data, in_path_stations, pivot=False):
     demand_df = pd.read_csv(in_path_data)
     stations_locations = pd.read_csv(in_path_stations).set_index("station_id")
     demand_df["timeslot"] = pd.to_datetime(demand_df["timeslot"])
-
-    # create matrix
-    if pivot:
-        demand_df = demand_df.pivot(
-            index="timeslot", columns="station_id", values="count"
-        ).fillna(0)
-    else:
-        demand_df.set_index("timeslot", inplace=True)
-    print("Demand matrix", demand_df.shape)
     # OPTIONAL: make even smaller excerpt
     # stations_included = stations_locations.sample(50).index
     # stations_locations = stations_locations[
@@ -197,6 +188,21 @@ if __name__ == "__main__":
             fillna_value=0,
         )
     else:
+        # pivot if necessary
+        if "station_id" in demand_agg.columns:
+            print("pivoting")
+            demand_agg = demand_agg.pivot(
+                index="timeslot", columns="station_id", values="count"
+            ).fillna(0)
+            demand_agg = (
+                demand_agg.reset_index()
+                .rename_axis(None, axis=1)
+                .set_index("timeslot")
+            )
+        else:
+            demand_agg.set_index("timeslot", inplace=True)
+        print("Demand matrix", demand_agg.shape)
+
         shared_demand_series = TimeSeries.from_dataframe(
             demand_agg, freq="1h", fillna_value=0
         )
