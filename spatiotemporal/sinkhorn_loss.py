@@ -3,6 +3,8 @@ import torch
 import numpy as np
 from torch.nn import MSELoss
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 
 class SinkhornLoss:
     def __init__(self, C, normalize_c=True, blur=0.5, **sinkhorn_kwargs):
@@ -18,7 +20,7 @@ class SinkhornLoss:
 
         # cost matrics and locs both need a static representation and are
         # modified later to match the batch size
-        self.cost_matrix = C
+        self.cost_matrix = C.to(device)
         self.cost_matrix_original = self.cost_matrix.clone()
         self.dummy_locs = torch.tensor(
             [[[i] for i in range(C.size()[-1])]]
