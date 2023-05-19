@@ -209,6 +209,8 @@ if __name__ == "__main__":
             demand_agg, freq="1h", fillna_value=0
         )
 
+    out_name = construct_name(args)
+
     training_kwargs = vars(args)
 
     # Initialize loss function
@@ -227,7 +229,7 @@ if __name__ == "__main__":
     test_models(
         shared_demand_series,
         out_path,
-        model_out_name=construct_name(args),
+        model_out_name=out_name,
         **training_kwargs,
     )
 
