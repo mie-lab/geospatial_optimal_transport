@@ -19,11 +19,8 @@ def compare_was(res, iters=300, sinkhorn_kwargs={}):
             b = np.ones(len(b))
         test_cdist = rand_rows[["x", "y"]].values
         test_cdist = cdist(test_cdist, test_cdist)
-        # normalize to values between 0 and 1
-        test_cdist = test_cdist / np.max(test_cdist)
-        a = a / np.sum(a)
-        b = b / np.sum(b)
 
+        # 1) sinkhorn
         torch_res.append(
             sinkhorn_loss_from_numpy(
                 np.expand_dims(a, 0),
@@ -32,6 +29,11 @@ def compare_was(res, iters=300, sinkhorn_kwargs={}):
                 sinkhorn_kwargs,
             )
         )
+        # 2) real wasserstein distance
+        # normalize to values between 0 and 1
+        test_cdist = test_cdist / np.max(test_cdist)
+        a = a / np.sum(a)
+        b = b / np.sum(b)
         was = wasserstein.EMD()
         emd_res.append(was(a, b, test_cdist))
 
@@ -75,10 +77,11 @@ def check_pred_gt(res, sinkhorn_kwargs={}):
 if __name__ == "__main__":
     import pandas as pd
 
-    in_path = "outputs/test/"
-    station_groups = pd.read_csv(in_path + "station_groups.csv")
+    in_path = "outputs/comp_17_05_all/"
+    model_path = "0_24_1_nhits_multi_50_3_3_0.csv"
     res_gt = pd.read_csv(in_path + "gt.csv")
-    res_pred = pd.read_csv(in_path + "linear_multi_no.csv")
+    res_pred = pd.read_csv(in_path + model_path)
+    station_groups = pd.read_csv("../data/bikes_montreal/test_stations.csv")
     together = res_pred.merge(
         res_gt,
         left_on=["group", "steps_ahead", "val_sample_ind"],
@@ -86,6 +89,6 @@ if __name__ == "__main__":
         how="left",
     )
     together = together.merge(
-        station_groups, how="left", left_on="group", right_on="group"
+        station_groups, how="left", left_on="group", right_on="station_id"
     )
     compare_was(together)

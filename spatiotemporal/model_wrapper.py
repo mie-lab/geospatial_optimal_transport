@@ -101,6 +101,10 @@ class ModelWrapper:
             "output_chunk_length"
         ]
 
+        # add loss function
+        if "loss_fn" in self.model_args:
+            model_kwargs["loss_fn"] = self.model_args["loss_fn"]
+
         # initialize
         self.model = ModelClass(**model_kwargs)
         self.covariate_wrapper = covariate_wrapper

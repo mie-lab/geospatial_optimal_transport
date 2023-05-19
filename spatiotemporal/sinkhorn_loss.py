@@ -1,6 +1,7 @@
 import geomloss
 import torch
 import numpy as np
+from torch.nn import MSELoss
 
 
 class SinkhornLoss:
@@ -37,14 +38,19 @@ class SinkhornLoss:
     def get_cost(self, a, b):
         return self.cost_matrix
 
-    def __call__(self, a, b):
+    def __call__(self, a_in, b_in):
         # Adapt cost matrix size to the batch size
-        batch_size = a.size()[0]
+        batch_size = a_in.size()[0]
         if self.cost_matrix.size()[0] != batch_size:
             self.cost_matrix = self.cost_matrix_original.repeat(
                 (batch_size, 1, 1)
             )
             self.dummy_locs = self.dummy_locs_orig.repeat((batch_size, 1, 1))
+
+        # normalize a and b
+        adim = a_in.dim() - 1
+        a = a_in / torch.sum(a_in, axis=adim).unsqueeze(adim)
+        b = b_in / torch.sum(b_in, axis=adim).unsqueeze(adim)
 
         # check if we predicted several steps ahead
         steps_ahead = a.size()[1]
@@ -60,13 +66,23 @@ class SinkhornLoss:
         return torch.sum(loss)
 
 
-def sinkhorn_loss_from_numpy(a, b, cost_matrix, sinkhorn_kwargs={}):
-    batch_size = len(a)
+class DistributionMSE:
+    def __init__(self) -> None:
+        self.standard_mse = MSELoss()
 
+    def __call__(self, a_in, b_in):
+        # normalize a and b
+        adim = a_in.dim() - 1
+        a = a_in / torch.sum(a_in, axis=adim).unsqueeze(adim)
+        b = b_in / torch.sum(b_in, axis=adim).unsqueeze(adim)
+
+        # apply standard MSE
+        return self.standard_mse(a, b)
+
+
+def sinkhorn_loss_from_numpy(a, b, cost_matrix, sinkhorn_kwargs={}):
     a = torch.tensor(a.tolist()).float()
-    a = a / torch.sum(a)
     b = torch.tensor(b.tolist()).float()
-    b = b / torch.sum(b)
     # cost_matrix = torch.tensor([cost_matrix])
     # # Testing for the case where multiple steps ahead are predicted
     # a = a.unsqueeze(1).repeat(1, 3, 1)

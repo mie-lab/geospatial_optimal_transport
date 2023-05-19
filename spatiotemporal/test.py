@@ -7,11 +7,13 @@ import matplotlib.pyplot as plt
 
 from darts import TimeSeries, concatenate
 from darts.dataprocessing.transformers import MinTReconciliator
+from scipy.spatial.distance import cdist
 
 from model_wrapper import ModelWrapper, CovariateWrapper
 from hierarchy_utils import add_demand_groups
 from station_hierarchy import StationHierarchy
 from utils import argument_parsing, construct_name
+from sinkhorn_loss import SinkhornLoss, DistributionMSE
 from config import (
     STEPS_AHEAD,
     TRAIN_CUTOFF,
@@ -207,12 +209,26 @@ if __name__ == "__main__":
             demand_agg, freq="1h", fillna_value=0
         )
 
+    training_kwargs = vars(args)
+
+    # Initialize loss function
+    if args.x_loss_function == "sinkhorn":
+        # sort stations by the same order as the demand columns
+        station_coords = stations_locations.loc[
+            demand_agg.columns, ["x", "y"]
+        ].values
+        station_cdist = cdist(station_coords, station_coords)
+        station_cdist = station_cdist / np.max(station_cdist)
+        training_kwargs["loss_fn"] = SinkhornLoss(station_cdist)
+    elif args.x_loss_function == "distribution":
+        training_kwargs["loss_fn"] = DistributionMSE()
+
     # Run model comparison
     test_models(
         shared_demand_series,
         out_path,
         model_out_name=construct_name(args),
-        **vars(args),
+        **training_kwargs,
     )
 
     if args.hierarchy:

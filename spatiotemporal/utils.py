@@ -30,6 +30,7 @@ def argument_parsing():
     parser.add_argument("-l", "--lags", default=24, type=int)
     parser.add_argument("--output_chunk_length", default=3, type=int)
     parser.add_argument("--n_epochs", default=50, type=int)
+    parser.add_argument("--x_loss_function", default="basic", type=str)
     parser.add_argument("--num_stacks", default=3, type=int)
     # set to 0 for not using past covariates
     parser.add_argument("--lags_past_covariates", default=1, type=int)
