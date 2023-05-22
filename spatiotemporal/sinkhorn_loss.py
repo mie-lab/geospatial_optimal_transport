@@ -68,6 +68,18 @@ class SinkhornLoss:
         return torch.sum(loss)
 
 
+class CombinedLoss:
+    def __init__(self, C, dist_weight=0.9) -> None:
+        self.standard_mse = MSELoss()
+        self.sinkhorn_error = SinkhornLoss(C)
+        self.dist_weight = dist_weight
+
+    def __call__(self, a_in, b_in):
+        mse_loss = self.standard_mse(a_in, b_in)
+        sink_loss = self.sinkhorn_error(a_in, b_in) * 1e5
+        return (1 - self.dist_weight) * mse_loss + self.dist_weight * sink_loss
+
+
 class DistributionMSE:
     def __init__(self) -> None:
         self.standard_mse = MSELoss()

@@ -13,7 +13,7 @@ from model_wrapper import ModelWrapper, CovariateWrapper
 from hierarchy_utils import add_demand_groups
 from station_hierarchy import StationHierarchy
 from utils import argument_parsing, construct_name
-from sinkhorn_loss import SinkhornLoss, DistributionMSE
+from sinkhorn_loss import SinkhornLoss, DistributionMSE, CombinedLoss
 from config import (
     STEPS_AHEAD,
     TRAIN_CUTOFF,
@@ -214,14 +214,19 @@ if __name__ == "__main__":
     training_kwargs = vars(args)
 
     # Initialize loss function
-    if args.x_loss_function == "sinkhorn":
+    if "sinkhorn" in args.x_loss_function:
         # sort stations by the same order as the demand columns
         station_coords = stations_locations.loc[
             demand_agg.columns, ["x", "y"]
         ].values
         station_cdist = cdist(station_coords, station_coords)
         station_cdist = station_cdist / np.max(station_cdist)
-        training_kwargs["loss_fn"] = SinkhornLoss(station_cdist)
+        if args.x_loss_function == "sinkhorn":
+            training_kwargs["loss_fn"] = SinkhornLoss(station_cdist)
+        elif args.x_loss_function == "combined_sinkhorn":
+            training_kwargs["loss_fn"] = CombinedLoss(station_cdist)
+        else:
+            raise NotImplementedError("Must be sinhorn or combined_sinkhorn")
     elif args.x_loss_function == "distribution":
         training_kwargs["loss_fn"] = DistributionMSE()
 
