@@ -1,3 +1,5 @@
+import torchmetrics
+import torch
 from darts.models import (
     LinearRegressionModel,
     XGBModel,
@@ -65,10 +67,12 @@ class ModelWrapper:
         self.model_args = kwargs
 
         # decide if using past covariates
+        encoders = {}
         if lags_past_covariates == 0:
             self.model_args["lags_past_covariates"] = None
         else:
             self.model_args["lags_past_covariates"] = lags_past_covariates
+            encoders["cyclic"] = {"past": ["hour", "day", "weekday"]}
 
         # set model class and model kwargs
         if model_class == "linear":
@@ -80,7 +84,17 @@ class ModelWrapper:
                 "input_chunk_length": self.model_args["lags"],
                 "n_epochs": self.model_args["n_epochs"],
                 "num_stacks": self.model_args["num_stacks"],
+                "work_dir": "trained_models",
+                "model_name": self.model_args["model_name"],
+                "log_tensorboard": True,
+                "torch_metrics": torchmetrics.MetricCollection(
+                    torchmetrics.MeanSquaredError(), torch.nn.CrossEntropyLoss()
+                ),
             }
+            if kwargs["x_scale"]:
+                encoders["transformer"] = Scaler()
+                model_kwargs["add_encoders"] = encoders
+
         elif model_class == "lightgbm":
             ModelClass = LightGBMModel
             model_kwargs = {

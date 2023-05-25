@@ -13,6 +13,7 @@ __pycache__/
 deprecated.py
 data/
 outputs/
+trained_models/
 figures/
 *.ipynb
 

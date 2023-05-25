@@ -13,7 +13,12 @@ from model_wrapper import ModelWrapper, CovariateWrapper
 from hierarchy_utils import add_demand_groups
 from station_hierarchy import StationHierarchy
 from utils import argument_parsing, construct_name
-from sinkhorn_loss import SinkhornLoss, DistributionMSE, CombinedLoss
+from sinkhorn_loss import (
+    SinkhornLoss,
+    DistributionMSE,
+    CombinedLoss,
+    StepwiseCrossentropy,
+)
 from config import (
     STEPS_AHEAD,
     TRAIN_CUTOFF,
@@ -209,9 +214,7 @@ if __name__ == "__main__":
             demand_agg, freq="1h", fillna_value=0
         )
 
-    out_name = construct_name(args)
-
-    training_kwargs = vars(args)
+    out_name, training_kwargs = construct_name(args)
 
     # Initialize loss function
     if "sinkhorn" in args.x_loss_function:
@@ -229,6 +232,8 @@ if __name__ == "__main__":
             raise NotImplementedError("Must be sinhorn or combined_sinkhorn")
     elif args.x_loss_function == "distribution":
         training_kwargs["loss_fn"] = DistributionMSE()
+    elif args.x_loss_function == "crossentropy":
+        training_kwargs["loss_fn"] = StepwiseCrossentropy()
 
     # Run model comparison
     test_models(

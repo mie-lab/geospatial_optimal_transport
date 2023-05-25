@@ -31,6 +31,7 @@ def argument_parsing():
     parser.add_argument("--output_chunk_length", default=3, type=int)
     parser.add_argument("--n_epochs", default=50, type=int)
     parser.add_argument("--x_loss_function", default="basic", type=str)
+    parser.add_argument("--x_scale", default=1, type=int)
     parser.add_argument("--num_stacks", default=3, type=int)
     # set to 0 for not using past covariates
     parser.add_argument("--lags_past_covariates", default=1, type=int)
@@ -48,7 +49,8 @@ def construct_name(args):
     sorted_dict = collections.OrderedDict(sorted(arg_dict.items()))
     args_as_str = "_".join([str(v) for v in sorted_dict.values()])
     print("Saving as ", args_as_str)
-    return args_as_str
+    arg_dict["model_name"] = args_as_str
+    return args_as_str, arg_dict
 
 
 def get_error_group_level(pred, val, station_groups):
