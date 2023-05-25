@@ -93,13 +93,9 @@ def cluster_agglomerative(station_locations):
 
 
 def add_demand_groups(demand_agg, hier):
-    # convert to string columns
-    demand_agg = (
-        demand_agg.reset_index().rename_axis(None, axis=1).set_index("timeslot")
-    )
+    """Add groups of station to time series dataframe"""
     demand_agg.columns = demand_agg.columns.astype(str)
     demand_agg.index = pd.to_datetime(demand_agg.index)
-
     for key, pair in hier.items():
         demand_agg[key] = (
             demand_agg[pair[0]].values + demand_agg[pair[1]].values

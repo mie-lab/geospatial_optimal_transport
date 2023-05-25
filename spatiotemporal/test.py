@@ -33,7 +33,7 @@ warnings.filterwarnings("ignore")
 np.random.seed(42)
 
 
-def clean_single_pred(pred, pred_or_gt="pred"):
+def clean_single_pred(pred, pred_or_gt="pred", clip=True, apply_exp=False):
     result_as_df = pred.pd_dataframe().swapaxes(1, 0).reset_index()
     result_as_df.rename(
         columns={c: i for i, c in enumerate(result_as_df.columns[1:])},
@@ -43,7 +43,10 @@ def clean_single_pred(pred, pred_or_gt="pred"):
         {"component": "group", "value": pred_or_gt, "timeslot": "steps_ahead"},
         axis=1,
     )
-    result_as_df[pred_or_gt].clip(0, MAX_RENTALS, inplace=True)
+    if apply_exp:
+        result_as_df[pred_or_gt] = np.exp(result_as_df[pred_or_gt])
+    if clip:
+        result_as_df[pred_or_gt].clip(0, MAX_RENTALS, inplace=True)
     return result_as_df
 
 
@@ -59,6 +62,20 @@ def load_data(in_path_data, in_path_stations, pivot=False):
     # # reduce demand matrix shape
     # demand_agg = demand_agg[stations_included]
     # print(demand_agg.shape)
+    # pivot if necessary
+    if "station_id" in demand_df.columns:
+        print("pivoting")
+        demand_df = demand_df.pivot(
+            index="timeslot", columns="station_id", values="count"
+        ).fillna(0)
+        demand_df = (
+            demand_df.reset_index()
+            .rename_axis(None, axis=1)
+            .set_index("timeslot")
+        )
+    else:
+        demand_df.set_index("timeslot", inplace=True)
+    print("Demand matrix", demand_df.shape)
     return demand_df, stations_locations
 
 
@@ -153,8 +170,10 @@ def test_models(
         else:
             pred = pred_raw
 
-        # transform to flat df
-        result_as_df = clean_single_pred(pred)
+        # Clean: (transform to df, clip, etc)
+        # if loss function is just distribution, we apply exp to the results
+        apply_exp = kwargs["x_loss_function"] in ["sinkhorn", "distribution"]
+        result_as_df = clean_single_pred(pred, clip=True, apply_exp=apply_exp)
         # add info about val sample
         result_as_df["val_sample_ind"] = val_sample - train_cutoff
         model_res_dfs.append(result_as_df)
@@ -195,21 +214,6 @@ if __name__ == "__main__":
             fillna_value=0,
         )
     else:
-        # pivot if necessary
-        if "station_id" in demand_agg.columns:
-            print("pivoting")
-            demand_agg = demand_agg.pivot(
-                index="timeslot", columns="station_id", values="count"
-            ).fillna(0)
-            demand_agg = (
-                demand_agg.reset_index()
-                .rename_axis(None, axis=1)
-                .set_index("timeslot")
-            )
-        else:
-            demand_agg.set_index("timeslot", inplace=True)
-        print("Demand matrix", demand_agg.shape)
-
         shared_demand_series = TimeSeries.from_dataframe(
             demand_agg, freq="1h", fillna_value=0
         )

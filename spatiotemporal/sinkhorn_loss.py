@@ -55,9 +55,10 @@ class SinkhornLoss:
         # a_in = torch.sigmoid(a_in)
 
         # normalize a and b
-        adim = a_in.dim() - 1
-        a = a_in / torch.sum(a_in, axis=adim).unsqueeze(adim)
-        b = b_in / torch.sum(b_in, axis=adim).unsqueeze(adim)
+        a = a_in.softmax(dim=-1)
+        b = b_in.softmax(dim=-1)
+        # previous version: normalize by dividing by sum
+        # / torch.sum(a_in, axis=adim).unsqueeze(adim)
 
         # check if we predicted several steps ahead
         steps_ahead = a.size()[1]
@@ -70,7 +71,7 @@ class SinkhornLoss:
             loss = torch.mean(result, dim=0)
         else:
             loss = self.loss_object(a, self.dummy_locs, b, self.dummy_locs)
-        return torch.sum(loss)
+        return torch.sum(loss) * 1e5
 
 
 class CombinedLoss:
@@ -81,7 +82,7 @@ class CombinedLoss:
 
     def __call__(self, a_in, b_in):
         mse_loss = self.standard_mse(a_in, b_in)
-        sink_loss = self.sinkhorn_error(a_in, b_in) * 1e5
+        sink_loss = self.sinkhorn_error(a_in, b_in)
         return (1 - self.dist_weight) * mse_loss + self.dist_weight * sink_loss
 
 
@@ -91,9 +92,8 @@ class DistributionMSE:
 
     def __call__(self, a_in, b_in):
         # normalize a and b
-        adim = a_in.dim() - 1
-        a = a_in / torch.sum(a_in, axis=adim).unsqueeze(adim)
-        b = b_in / torch.sum(b_in, axis=adim).unsqueeze(adim)
+        a = a_in.softmax(dim=-1)
+        b = b_in.softmax(dim=-1)
 
         # apply standard MSE
         return self.standard_mse(a, b)
