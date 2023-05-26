@@ -94,6 +94,8 @@ def test_models(
 
     # select TEST_SAMPLES random time points during val time
     assert TEST_SAMPLES < len(shared_demand_series) - train_cutoff - STEPS_AHEAD
+    # ensure that the test samples are always the same
+    np.random.seed(48)
     random_val_samples = np.random.choice(
         np.arange(train_cutoff, len(shared_demand_series) - STEPS_AHEAD),
         TEST_SAMPLES,
