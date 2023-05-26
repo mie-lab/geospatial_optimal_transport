@@ -35,6 +35,8 @@ def argument_parsing():
     parser.add_argument("--num_stacks", default=3, type=int)
     # set to 0 for not using past covariates
     parser.add_argument("--lags_past_covariates", default=1, type=int)
+    parser.add_argument("--y_clustermethod", default=None, type=str)
+    parser.add_argument("--y_cluster_k", type=int, default=10)
     args = parser.parse_args()
     if args.reconcile > 0:
         assert args.hierarchy != 0

@@ -11,7 +11,7 @@ from scipy.spatial.distance import cdist
 
 from model_wrapper import ModelWrapper, CovariateWrapper
 from hierarchy_utils import add_demand_groups
-from station_hierarchy import StationHierarchy
+from station_hierarchy import StationHierarchy, SpatialClustering
 from utils import argument_parsing, construct_name
 from sinkhorn_loss import (
     SinkhornLoss,
@@ -179,6 +179,7 @@ def test_models(
         model_res_dfs.append(result_as_df)
 
     model_res_dfs = pd.concat(model_res_dfs)
+    model_res_dfs["gt"] = gt_res_dfs["gt"]  # add gt column to simplify later
     model_res_dfs.to_csv(
         os.path.join(out_path, f"{model_out_name}.csv"), index=False
     )
@@ -196,7 +197,7 @@ if __name__ == "__main__":
     demand_agg, stations_locations = load_data(in_path_data, in_path_stations)
 
     # construct hierarchy
-    if args.hierarchy:
+    if args.hierarchy and args.y_clustermethod == "agg":
         station_hierarchy = StationHierarchy()
         if "0" in demand_agg.columns:
             demand_agg.drop("0", axis=1, inplace=True)
@@ -205,7 +206,15 @@ if __name__ == "__main__":
             ]
         station_hierarchy.init_from_station_locations(stations_locations)
         demand_agg = add_demand_groups(demand_agg, station_hierarchy.hier)
-
+    elif args.y_clustermethod is not None:
+        station_hierarchy = SpatialClustering(stations_locations)
+        station_hierarchy(clustering_method=args.y_clustermethod)
+        # transform the demand to get the grouped df
+        demand_agg = station_hierarchy.transform_demand(
+            demand_agg, hierarchy=args.hierarchy
+        )
+    # init time series
+    if args.hierarchy:
         # initialize time series with hierarchy
         shared_demand_series = TimeSeries.from_dataframe(
             demand_agg,
@@ -249,4 +258,6 @@ if __name__ == "__main__":
 
     if args.hierarchy:
         # save the station hierarchy
-        station_hierarchy.save(out_path)
+        station_hierarchy.save(
+            os.path.join(out_path, out_name + "_hierarchy.json")
+        )
