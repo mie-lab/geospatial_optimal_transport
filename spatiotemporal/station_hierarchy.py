@@ -117,7 +117,6 @@ class StationHierarchy:
         return self.base_station
 
     def save(self, save_path):
-        os.makedirs(save_path, exist_ok=True)
         # self.station_groups.to_csv(
         #     os.path.join(save_path, "station_groups.csv")
         # )
@@ -169,7 +168,8 @@ class SpatialClustering:
             .to_dict()
         )
         station_cluster_dict = {
-            k: list(v) for k, v in station_cluster_dict.items()
+            k: [int(v_val) for v_val in v]
+            for k, v in station_cluster_dict.items()
         }
         station_cluster_dict["total"] = list(self.stations["cluster"].unique())
         return station_cluster_dict
@@ -183,7 +183,5 @@ class SpatialClustering:
         return darts_hier
 
     def save(self, save_path):
-        #         self.stations["cluster"].to_csv(save_path)
-        os.makedirs(save_path, exist_ok=True)
         with open(save_path, "w") as outfile:
             json.dump(self.get_topdown_hierarchy(), outfile)

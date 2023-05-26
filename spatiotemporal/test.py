@@ -208,7 +208,9 @@ if __name__ == "__main__":
         demand_agg = add_demand_groups(demand_agg, station_hierarchy.hier)
     elif args.y_clustermethod is not None:
         station_hierarchy = SpatialClustering(stations_locations)
-        station_hierarchy(clustering_method=args.y_clustermethod)
+        station_hierarchy(
+            clustering_method=args.y_clustermethod, n_clusters=args.y_cluster_k
+        )
         # transform the demand to get the grouped df
         demand_agg = station_hierarchy.transform_demand(
             demand_agg, hierarchy=args.hierarchy
@@ -256,7 +258,7 @@ if __name__ == "__main__":
         **training_kwargs,
     )
 
-    if args.hierarchy:
+    if args.y_clustermethod is not None:
         # save the station hierarchy
         station_hierarchy.save(
             os.path.join(out_path, out_name + "_hierarchy.json")
