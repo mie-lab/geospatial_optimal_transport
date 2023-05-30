@@ -112,7 +112,6 @@ def test_models(
         gt_as_df["val_sample_ind"] = val_sample - train_cutoff
         gt_res_dfs.append(gt_as_df)
     gt_res_dfs = pd.concat(gt_res_dfs).reset_index(drop=True)
-    gt_res_dfs.to_csv(os.path.join(out_path, "gt.csv"), index=False)
 
     # get past covariates
     cov_lag = (
@@ -180,8 +179,11 @@ def test_models(
         result_as_df["val_sample_ind"] = val_sample - train_cutoff
         model_res_dfs.append(result_as_df)
 
-    model_res_dfs = pd.concat(model_res_dfs)
-    model_res_dfs["gt"] = gt_res_dfs["gt"]  # add gt column to simplify later
+    model_res_dfs = pd.concat(model_res_dfs).reset_index(drop=True)
+    assert all(
+        model_res_dfs.drop("pred", axis=1) == gt_res_dfs.drop("gt", axis=1)
+    )
+    model_res_dfs["gt"] = gt_res_dfs["gt"].values
     model_res_dfs.to_csv(
         os.path.join(out_path, f"{model_out_name}.csv"), index=False
     )
