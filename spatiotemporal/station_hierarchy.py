@@ -140,6 +140,9 @@ class SpatialClustering:
         self.stations["cluster"] = "Group_" + self.stations["cluster"].astype(
             str
         )
+        self.groups_coordinates = self.stations.groupby("cluster").agg(
+            {"x": "mean", "y": "mean"}
+        )
 
     def transform_demand(self, demand_df_inp, hierarchy=False):
         """demand_df: Dataframe with rows = timestamps and columns=station ids"""

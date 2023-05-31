@@ -238,9 +238,14 @@ if __name__ == "__main__":
     # Initialize loss function
     if "sinkhorn" in args.x_loss_function:
         # sort stations by the same order as the demand columns
-        station_coords = stations_locations.loc[
-            demand_agg.columns, ["x", "y"]
-        ].values
+        if args.y_clustermethod is not None:
+            station_coords = station_hierarchy.groups_coordinates.loc[
+                demand_agg.columns
+            ].values
+        else:
+            station_coords = stations_locations.loc[
+                demand_agg.columns, ["x", "y"]
+            ].values
         station_cdist = cdist(station_coords, station_coords)
         station_cdist = station_cdist / np.max(station_cdist)
         if args.x_loss_function == "sinkhorn":
