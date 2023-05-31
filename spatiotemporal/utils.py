@@ -37,6 +37,8 @@ def argument_parsing():
     parser.add_argument("--lags_past_covariates", default=1, type=int)
     parser.add_argument("--y_clustermethod", default=None, type=str)
     parser.add_argument("--y_cluster_k", type=int, default=10)
+    parser.add_argument("--model_path", type=str, default="trained_models")
+    parser.add_argument("--load_model_name", type=str, default=None)
     args = parser.parse_args()
     if args.reconcile > 0:
         assert args.hierarchy != 0
@@ -45,12 +47,20 @@ def argument_parsing():
 
 def construct_name(args):
     arg_dict = vars(args)
-    arg_dict.pop("data_path")
-    arg_dict.pop("station_path")
-    arg_dict.pop("out_path")
-    sorted_dict = collections.OrderedDict(sorted(arg_dict.items()))
+    # generate save name from the sorted smaller dictionary (wo paths)
+    arg_dict_wo_path = arg_dict.copy()
+    for path_arg in [
+        "data_path",
+        "station_path",
+        "out_path",
+        "load_model_name",
+        "model_path",
+    ]:
+        arg_dict_wo_path.pop(path_arg)
+    sorted_dict = collections.OrderedDict(sorted(arg_dict_wo_path.items()))
     args_as_str = "_".join([str(v) for v in sorted_dict.values()])
     print("Saving as ", args_as_str)
+    # add model name to original dictionary
     arg_dict["model_name"] = args_as_str
     return args_as_str, arg_dict
 

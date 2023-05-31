@@ -1,3 +1,4 @@
+import os
 import torchmetrics
 import torch
 from darts.models import (
@@ -65,6 +66,11 @@ class ModelWrapper:
     ) -> None:
         # store model args
         self.model_args = kwargs
+        # set working directory
+        self.work_dir = os.path.join(
+            self.model_args["model_path"], self.model_args["model_name"]
+        )
+        os.makedirs(self.work_dir, exist_ok=True)
 
         # decide if using past covariates
         encoders = {}
@@ -84,7 +90,7 @@ class ModelWrapper:
                 "input_chunk_length": self.model_args["lags"],
                 "n_epochs": self.model_args["n_epochs"],
                 "num_stacks": self.model_args["num_stacks"],
-                "work_dir": "trained_models",
+                "work_dir": self.work_dir,
                 "model_name": self.model_args["model_name"],
                 "log_tensorboard": True,
                 "torch_metrics": torchmetrics.MetricCollection(
@@ -121,6 +127,16 @@ class ModelWrapper:
 
         # initialize
         self.model = ModelClass(**model_kwargs)
+        # load model if desired
+        load_model = self.model_args["load_model_name"]
+        if load_model is not None:
+            print("Loading model from", load_model)
+            self.model.load(
+                os.path.join(
+                    self.model_args["model_path"], load_model, "model.pt"
+                )
+            )
+
         self.covariate_wrapper = covariate_wrapper
 
     def fit(self, series):
@@ -138,3 +154,6 @@ class ModelWrapper:
             ),
         )
         return pred
+
+    def save(self):
+        self.model.save(os.path.join(self.work_dir, "model.pt"))

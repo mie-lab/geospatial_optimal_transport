@@ -85,7 +85,6 @@ def test_models(
     multi_vs_ind="multi",
     model="linear",
     reconcile=0,
-    model_out_name="test_model",
     **kwargs,
 ):
     # split train and val
@@ -184,10 +183,14 @@ def test_models(
         model_res_dfs.drop("pred", axis=1) == gt_res_dfs.drop("gt", axis=1)
     )
     model_res_dfs["gt"] = gt_res_dfs["gt"].values
+    model_name = kwargs.get("model_name", "test_model")
     model_res_dfs.to_csv(
-        os.path.join(out_path, f"{model_out_name}.csv"), index=False
+        os.path.join(out_path, f"{model_name}.csv"), index=False
     )
     print("Finished, runtime:", round(time.time() - tic, 2))
+
+    regr.save()
+    print("Model saved")
 
 
 if __name__ == "__main__":
@@ -262,8 +265,6 @@ if __name__ == "__main__":
     # Run model comparison
     test_models(
         shared_demand_series,
-        out_path,
-        model_out_name=out_name,
         **training_kwargs,
     )
 
