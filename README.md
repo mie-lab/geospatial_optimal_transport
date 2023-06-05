@@ -1,1 +1,1 @@
-# multi-scale-prediction
+# Earth mover distance for spatiotemporal predictions
