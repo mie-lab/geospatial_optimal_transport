@@ -2,23 +2,17 @@ import os
 import pandas as pd
 import time
 import numpy as np
-import argparse
-import matplotlib.pyplot as plt
-
 from darts import TimeSeries, concatenate
 from darts.dataprocessing.transformers import MinTReconciliator
 from scipy.spatial.distance import cdist
 
 from geoemd.model_wrapper import ModelWrapper, CovariateWrapper
-from geoemd.hierarchy_utils import add_demand_groups
-from geoemd.station_hierarchy import StationHierarchy, SpatialClustering
+from geoemd.hierarchy.hierarchy_utils import add_demand_groups
+from geoemd.hierarchy.full_station_hierarchy import FullStationHierarchy
+from geoemd.hierarchy.clustering_hierarchy import SpatialClustering
 from geoemd.utils import argument_parsing, construct_name
-from geoemd.sinkhorn_loss import (
-    SinkhornLoss,
-    DistributionMSE,
-    CombinedLoss,
-    StepwiseCrossentropy,
-)
+from geoemd.loss.sinkhorn_loss import SinkhornLoss, CombinedLoss
+from geoemd.loss.distribution_loss import StepwiseCrossentropy, DistributionMSE
 from config_bikes import STEPS_AHEAD, TRAIN_CUTOFF, TEST_SAMPLES, MAX_RENTALS
 import warnings
 
@@ -199,7 +193,7 @@ if __name__ == "__main__":
 
     # construct hierarchy
     if args.hierarchy and args.y_clustermethod == "agg":
-        station_hierarchy = StationHierarchy()
+        station_hierarchy = FullStationHierarchy()
         if "0" in demand_agg.columns:
             demand_agg.drop("0", axis=1, inplace=True)
             stations_locations = stations_locations[

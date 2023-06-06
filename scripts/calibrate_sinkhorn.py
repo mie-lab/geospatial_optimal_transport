@@ -3,7 +3,7 @@ import numpy as np
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 import wasserstein
-from sinkhorn_loss import sinkhorn_loss_from_numpy
+from geoemd.loss.sinkhorn_loss import sinkhorn_loss_from_numpy
 
 
 def compare_was(res, iters=300, sinkhorn_kwargs={}):

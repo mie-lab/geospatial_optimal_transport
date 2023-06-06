@@ -5,6 +5,8 @@ import numpy as np
 from scipy.spatial.distance import cdist
 from scipy.special import softmax
 
+from geoemd.hierarchy.hierarchy_utils import hierarchy_to_df
+
 """
 MODES:
 station_to_station: We have a prediction per group,
@@ -16,21 +18,6 @@ distances between group centers and stations as cdist
 group_to_group: We just compute the EMD error in terms of
 rebalancing between the clusters
 """
-
-
-def hierarchy_to_df(res_hierarchy):
-    # convert to df
-    station_group_df = []
-    for group, stations_in_group in res_hierarchy.items():
-        if group == "total":
-            continue
-        df = pd.DataFrame()
-        df["station"] = stations_in_group
-        df["group"] = group
-        df["nr_stations"] = len(stations_in_group)
-        station_group_df.append(df)
-    station_group_df = pd.concat(station_group_df).sort_values("station")
-    return station_group_df
 
 
 class EMDWrapper:

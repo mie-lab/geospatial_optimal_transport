@@ -3,11 +3,11 @@ import wasserstein
 import pandas as pd
 
 from utils import get_children_hierarchy
-from station_hierarchy import StationHierarchy
+from geoemd.hierarchy.full_station_hierarchy import FullStationHierarchy
 
 
 class OptimalTransportLoss:
-    def __init__(self, station_hierarchy: StationHierarchy):
+    def __init__(self, station_hierarchy: FullStationHierarchy):
         self.station_hierarchy = station_hierarchy
 
     def transport_from_centers(self, gt_col, pred_col):

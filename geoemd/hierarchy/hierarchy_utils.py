@@ -37,6 +37,21 @@ def clustering_algorithm(stations_locations):
     return clustering.children_
 
 
+def hierarchy_to_df(res_hierarchy):
+    # convert to df
+    station_group_df = []
+    for group, stations_in_group in res_hierarchy.items():
+        if group == "total":
+            continue
+        df = pd.DataFrame()
+        df["station"] = stations_in_group
+        df["group"] = group
+        df["nr_stations"] = len(stations_in_group)
+        station_group_df.append(df)
+    station_group_df = pd.concat(station_group_df).sort_values("station")
+    return station_group_df
+
+
 # # Deprecated
 # def demand_hierarchy(bookings_agg, linkage, nr_samples=len(stations_locations)):
 #     # initialize hierarchy
