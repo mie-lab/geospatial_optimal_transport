@@ -2,7 +2,7 @@ from scipy.spatial.distance import cdist
 import wasserstein
 import pandas as pd
 
-from utils import get_children_hierarchy
+from geoemd.utils import get_children_hierarchy
 from geoemd.hierarchy.full_station_hierarchy import FullStationHierarchy
 
 

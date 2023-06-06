@@ -4,7 +4,7 @@ import pandas as pd
 import json
 import seaborn as sns
 
-from emd_eval import EMDWrapper
+from geoemd.emd_eval import EMDWrapper
 
 
 def plot_error_evolvement(error_evolvement, out_path=None):

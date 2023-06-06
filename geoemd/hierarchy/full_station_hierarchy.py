@@ -2,7 +2,7 @@ import os
 import json
 import pandas as pd
 
-from hierarchy_utils import cluster_agglomerative
+from geoemd.hierarchy.hierarchy_utils import cluster_agglomerative
 
 
 class FullStationHierarchy:
