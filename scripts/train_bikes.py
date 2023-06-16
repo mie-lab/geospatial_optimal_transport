@@ -218,7 +218,7 @@ if __name__ == "__main__":
             demand_agg, hierarchy=args.hierarchy
         )
 
-    demand_max = demand_agg.max().max()
+    demand_max = np.quantile(demand_agg.values, 0.95)  # demand_agg.max().max()
 
     # init time series
     if args.hierarchy:

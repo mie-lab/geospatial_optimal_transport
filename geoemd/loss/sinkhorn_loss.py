@@ -54,10 +54,18 @@ class SinkhornLoss:
         # # apply sigmoid to prediction
         # a_in = torch.sigmoid(a_in)
 
+        # put b values to the same sum as the a values because then we get the
+        # same values
+        adim = a_in.dim() - 1
+        b_in = (
+            b_in
+            / torch.sum(b_in, dim=-1).unsqueeze(adim)
+            * torch.sum(a_in, dim=-1).detach().unsqueeze(adim)
+        )
         # normalize a and b
         a = (a_in * 2.71828).softmax(dim=-1)
         b = (b_in * 2.71828).softmax(dim=-1)
-        
+
         # check if we predicted several steps ahead
         steps_ahead = a.size()[1]
         if a.dim() > 2 and steps_ahead > 1:
@@ -69,7 +77,7 @@ class SinkhornLoss:
             loss = torch.mean(result, dim=0)
         else:
             loss = self.loss_object(a, self.dummy_locs, b, self.dummy_locs)
-        return torch.sum(loss) * 1e5
+        return torch.sum(loss)
 
 
 class CombinedLoss:
@@ -81,6 +89,8 @@ class CombinedLoss:
     def __call__(self, a_in, b_in):
         mse_loss = self.standard_mse(a_in, b_in)
         sink_loss = self.sinkhorn_error(a_in, b_in)
+        # for checking calibration of weighting
+        # print((1 - self.dist_weight) * mse_loss, self.dist_weight * sink_loss)
         return (1 - self.dist_weight) * mse_loss + self.dist_weight * sink_loss
 
 
