@@ -72,9 +72,13 @@ def test_models(
     out_path,
     multi_vs_ind="multi",
     model="linear",
+    max_to_norm=10,
     reconcile=0,
     **kwargs,
 ):
+    # normalize whole time series
+    shared_demand_series = shared_demand_series / max_to_norm
+
     # split train and val
     train_cutoff = int(TRAIN_CUTOFF * len(shared_demand_series))
     train = shared_demand_series[:train_cutoff]
@@ -167,10 +171,13 @@ def test_models(
         model_res_dfs.append(result_as_df)
 
     model_res_dfs = pd.concat(model_res_dfs).reset_index(drop=True)
+    # re-nomalize and add gt
+    model_res_dfs["pred"] *= max_to_norm
     assert all(
         model_res_dfs.drop("pred", axis=1) == gt_res_dfs.drop("gt", axis=1)
     )
-    model_res_dfs["gt"] = gt_res_dfs["gt"].values
+    model_res_dfs["gt"] = gt_res_dfs["gt"].values * max_to_norm
+    # save with save name
     model_name = kwargs.get("model_name", "test_model")
     model_res_dfs.to_csv(
         os.path.join(out_path, f"{model_name}.csv"), index=False
@@ -210,6 +217,9 @@ if __name__ == "__main__":
         demand_agg = station_hierarchy.transform_demand(
             demand_agg, hierarchy=args.hierarchy
         )
+
+    demand_max = demand_agg.max().max()
+
     # init time series
     if args.hierarchy:
         # initialize time series with hierarchy
@@ -253,6 +263,7 @@ if __name__ == "__main__":
     # Run model comparison
     test_models(
         shared_demand_series,
+        max_to_norm=demand_max,
         **training_kwargs,
     )
 

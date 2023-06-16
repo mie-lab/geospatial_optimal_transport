@@ -55,11 +55,9 @@ class SinkhornLoss:
         # a_in = torch.sigmoid(a_in)
 
         # normalize a and b
-        a = a_in.softmax(dim=-1)
-        b = b_in.softmax(dim=-1)
-        # previous version: normalize by dividing by sum
-        # / torch.sum(a_in, axis=adim).unsqueeze(adim)
-
+        a = (a_in * 2.71828).softmax(dim=-1)
+        b = (b_in * 2.71828).softmax(dim=-1)
+        
         # check if we predicted several steps ahead
         steps_ahead = a.size()[1]
         if a.dim() > 2 and steps_ahead > 1:
