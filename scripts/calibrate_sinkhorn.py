@@ -4,6 +4,35 @@ from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 import wasserstein
 from geoemd.loss.sinkhorn_loss import sinkhorn_loss_from_numpy
+from scipy.special import softmax
+
+# backup loss versions of sinkhorn loss:
+# normalize a and b
+# a = a_in
+# b = b_in
+# print(a_in, b_in)
+# max_val_a, _ = torch.max(a_in, dim=-1)
+# max_val_b, _ = torch.max(b_in, dim=-1)
+# a = (a_in * 2.71828).softmax(dim=-1)
+# b = (b_in * 2.71828).softmax(dim=-1)
+# .softmax(dim=-1)  # shape [batch_size, horizon, nr_clusters]
+# print(a[0, 0])
+# print(b[0, 0])
+# previous version: normalize by dividing by sum
+# a = a_in / torch.sum(a_in, dim=-1)  # .softmax(dim=-1)  # TODO
+# b = b_in / torch.sum(b_in, dim=-1)
+# # combined softmax
+# a_len = a_in.size()[-1]
+# a_dim = a_in.dim()
+# together = torch.cat((a_in, b_in), dim=a_dim - 1)
+# together = together.softmax(dim=-1)
+# if a_dim > 2:
+#     a = together[:, :, :a_len]
+#     b = together[:, :, a_len:]
+# else:
+#     a = together[:, :a_len]
+#     b = together[:, a_len:]
+# print(together.size(), a_in.size(), b_in.size(), a.size(), b.size())
 
 
 def compare_was(res, iters=300, sinkhorn_kwargs={}):
@@ -34,6 +63,7 @@ def compare_was(res, iters=300, sinkhorn_kwargs={}):
         test_cdist = test_cdist / np.max(test_cdist)
         a = a / np.sum(a)
         b = b / np.sum(b)
+
         was = wasserstein.EMD()
         emd_res.append(was(a, b, test_cdist))
 
@@ -81,7 +111,7 @@ if __name__ == "__main__":
     model_path = "0_24_1_nhits_multi_50_3_3_0.csv"
     res_gt = pd.read_csv(in_path + "gt.csv")
     res_pred = pd.read_csv(in_path + model_path)
-    station_groups = pd.read_csv("../data/bikes_montreal/test_stations.csv")
+    station_groups = pd.read_csv("data/bikes_montreal/test_stations.csv")
     together = res_pred.merge(
         res_gt,
         left_on=["group", "steps_ahead", "val_sample_ind"],

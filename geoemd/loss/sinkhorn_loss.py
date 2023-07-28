@@ -1,4 +1,3 @@
-from typing import Any
 import geomloss
 import torch
 import numpy as np
@@ -65,6 +64,9 @@ class SinkhornLoss:
         # normalize a and b
         a = (a_in * 2.71828).softmax(dim=-1)
         b = (b_in * 2.71828).softmax(dim=-1)
+        # # for 96% calibration, replace the previous 8 lines by the following:
+        # a = (a_in).softmax(dim=-1)
+        # b = (b_in).softmax(dim=-1)
 
         # check if we predicted several steps ahead
         steps_ahead = a.size()[1]
@@ -90,7 +92,7 @@ class CombinedLoss:
         mse_loss = self.standard_mse(a_in, b_in)
         sink_loss = self.sinkhorn_error(a_in, b_in)
         # for checking calibration of weighting
-        # print((1 - self.dist_weight) * mse_loss, self.dist_weight * sink_loss)
+        # print((1 - self.dist_weight) * mse_loss,self.dist_weight * sink_loss)
         return (1 - self.dist_weight) * mse_loss + self.dist_weight * sink_loss
 
 

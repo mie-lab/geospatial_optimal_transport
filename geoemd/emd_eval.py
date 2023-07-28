@@ -1,4 +1,3 @@
-from typing import Any
 import wasserstein
 import pandas as pd
 import numpy as np
@@ -119,12 +118,12 @@ class EMDWrapper:
             ["val_sample_ind", "steps_ahead"]
         ):
             sample_df = sample_df.sort_values("station")
-            pred_vals = softmax(sample_df["pred_emd"].values)
+            pred_vals = sample_df["pred_emd"] / sample_df["pred_emd"].sum()
             # get corresponding ground truth df
             gt_df = self.gt_reference.loc[val_sample, steps_ahead].sort_values(
                 "station"
             )
-            gt_vals = softmax(gt_df["gt"].values)
+            gt_vals = gt_df["gt"] / gt_df["gt"].sum()
             # compute wasserstein
             was = wasserstein.EMD()
             emd_distance = was(
@@ -132,6 +131,12 @@ class EMDWrapper:
                 gt_vals,
                 self.dist_matrix,
             )
-            emd.append(emd_distance)
+            emd.append(
+                {
+                    "EMD": emd_distance,
+                    "val_sample_ind": val_sample,
+                    "steps_ahead": steps_ahead,
+                }
+            )
 
-        return emd
+        return pd.DataFrame(emd)

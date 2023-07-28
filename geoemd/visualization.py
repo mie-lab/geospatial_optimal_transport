@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import json
 import seaborn as sns
+from sklearn.cluster import KMeans
 
 from geoemd.emd_eval import EMDWrapper
 
@@ -31,54 +32,20 @@ def plot_error_evolvement(error_evolvement, out_path=None):
         plt.savefig(out_path)
 
 
-def plot_emd(path, out_path="figures"):
-    subset = [f for f in os.listdir(path) if "150" in f and "csv" in f]
-    subset_name_mapping = {
-        "1_24_1_nhits_multi_70_3_3_1_basic_1_150_kmeans": "Kmeans hierarchical\n reconciled",
-        "0_24_1_nhits_multi_70_3_3_0_basic_1_150_agg": "agglomerative",
-        "0_24_1_nhits_multi_70_3_3_0_combined_sinkhorn_1_150_kmeans": "sinkhorn\n (Kmeans)",
-        "1_24_1_nhits_multi_70_3_3_0_basic_1_150_kmeans": "Kmeans \n hierarchical",
-        "0_24_1_nhits_multi_70_3_3_0_crossentropy_1_150_agg": "cross-entropy\n (agglomerative)",
-        "0_24_1_nhits_multi_70_3_3_0_distribution_1_150_agg": "distribution \n(agglomerative)",
-        "0_24_1_nhits_multi_70_3_3_0_basic_1_150_kmeans": "Kmeans",
-    }
+def plot_stations(
+    out_path, station_path="data/bikes_montreal/test_stations.csv"
+):
+    stations = pd.read_csv(station_path).set_index("station_id")
 
-    gt_file = [f for f in os.listdir(path) if "None" in f][0]
-    # load gt as reference (per station gt needed for evaluation)
-    gt_reference = pd.read_csv(os.path.join(path, gt_file)).drop("pred", axis=1)
-    # load stations
-    stations = (
-        pd.read_csv("data/bikes_montreal/test_stations.csv")
-        .sort_values("station_id")
-        .set_index("station_id")
-    )
+    plt.scatter(stations["x"], stations["y"])
+    plt.xlabel("Projected x coordinate")
+    plt.ylabel("Projected y coordinate")
+    plt.savefig(os.path.join(out_path, "all_stations.csv"))
 
-    emd_res_dict = {}
-    for f in subset:
-        print(f)
-        res = pd.read_csv(os.path.join(path, f))
-        with open(
-            os.path.join(path, f[:-4] + "_hierarchy.json"), "r"
-        ) as infile:
-            res_hierarchy = json.load(infile)
-
-        if f.startswith("1"):
-            # reduce to groups
-            res = res[res["group"].str.contains("Group")]
-
-        emd_compute = EMDWrapper(stations, gt_reference)
-        emd_vals = emd_compute(res, res_hierarchy, mode="group_to_group")
-        emd_res_dict[subset_name_mapping[f[:-4]]] = emd_vals
-
-    # simplify the data (just plot the average)
-    emd_plot_df = pd.DataFrame(
-        pd.DataFrame(emd_res_dict).mean(), columns=["EMD"]
-    ).sort_values("EMD")
-    emd_plot_df.index.name = "Method"
-    emd_plot_df.reset_index(inplace=True)
-
-    # plot
-    plt.figure(figsize=(20, 5))
-    sns.barplot(data=emd_plot_df, x="Method", y="EMD")
-    plt.tight_layout()
-    plt.savefig(os.path.join(out_path, "emd_comparison.pdf"))
+    for k in [5, 10, 20, 40]:
+        clustering = KMeans(k)
+        clustering.fit(stations)
+        plt.scatter(stations["x"], stations["y"], c=clustering.labels_)
+        plt.xlabel("Projected x coordinate")
+        plt.ylabel("Projected y coordinate")
+        plt.savefig(os.path.join(out_path, f"stations_clustered_{k}.csv"))
