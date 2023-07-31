@@ -20,6 +20,8 @@ warnings.filterwarnings("ignore")
 
 np.random.seed(42)
 
+frequency = {"bikes": "1h", "charging": "15min"}
+
 
 def clean_single_pred(pred, pred_or_gt="pred", clip=True, apply_exp=False):
     result_as_df = pred.pd_dataframe().swapaxes(1, 0).reset_index()
@@ -195,6 +197,8 @@ if __name__ == "__main__":
     out_path = args.out_path
     os.makedirs(out_path, exist_ok=True)
 
+    dataset = "bikes" if "bikes" in in_path_data else "charging"
+
     # TODO: set pivot argument of load_data
     demand_agg, stations_locations = load_data(in_path_data, in_path_stations)
 
@@ -225,13 +229,13 @@ if __name__ == "__main__":
         # initialize time series with hierarchy
         shared_demand_series = TimeSeries.from_dataframe(
             demand_agg,
-            freq="1h",
+            freq=frequency[dataset],
             hierarchy=station_hierarchy.get_darts_hier(),
             fillna_value=0,
         )
     else:
         shared_demand_series = TimeSeries.from_dataframe(
-            demand_agg, freq="1h", fillna_value=0
+            demand_agg, freq=frequency[dataset], fillna_value=0
         )
 
     out_name, training_kwargs = construct_name(args)
