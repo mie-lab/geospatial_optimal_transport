@@ -249,9 +249,9 @@ if __name__ == "__main__":
             ].values
         station_cdist = cdist(station_coords, station_coords)
         station_cdist = station_cdist / np.max(station_cdist)
-        if args.x_loss_function == "sinkhorn":
+        if args.x_loss_function == "onlysinkhorn":
             training_kwargs["loss_fn"] = SinkhornLoss(station_cdist)
-        elif args.x_loss_function == "combined_sinkhorn":
+        elif args.x_loss_function == "sinkhorn":
             training_kwargs["loss_fn"] = CombinedLoss(station_cdist)
         else:
             raise NotImplementedError("Must be sinhorn or combined_sinkhorn")

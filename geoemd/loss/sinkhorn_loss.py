@@ -50,23 +50,12 @@ class SinkhornLoss:
             )
             self.dummy_locs = self.dummy_locs_orig.repeat((batch_size, 1, 1))
 
-        # # apply sigmoid to prediction
-        # a_in = torch.sigmoid(a_in)
-
-        # put b values to the same sum as the a values because then we get the
-        # same values
-        adim = a_in.dim() - 1
-        b_in = (
-            b_in
-            / torch.sum(b_in, dim=-1).unsqueeze(adim)
-            * torch.sum(a_in, dim=-1).detach().unsqueeze(adim)
-        )
-        # normalize a and b
+        # this yields a spearman correlation of 0.74
         a = (a_in * 2.71828).softmax(dim=-1)
-        b = (b_in * 2.71828).softmax(dim=-1)
-        # # for 96% calibration, replace the previous 8 lines by the following:
-        # a = (a_in).softmax(dim=-1)
-        # b = (b_in).softmax(dim=-1)
+        # for spearman correlation of 0.95, use:
+        # a = a_in / torch.unsqueeze(torch.sum(a_in, dim=-1), a_in.dim() - 1)
+        # print(b_in.size(), torch.sum(b_in, dim=-1).size())
+        b = b_in / torch.unsqueeze(torch.sum(b_in, dim=-1), b_in.dim() - 1)
 
         # check if we predicted several steps ahead
         steps_ahead = a.size()[1]

@@ -1,10 +1,14 @@
+import os
 from scipy.stats import spearmanr
 import numpy as np
+import pandas as pd
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 import wasserstein
-from geoemd.loss.sinkhorn_loss import sinkhorn_loss_from_numpy
 from scipy.special import softmax
+
+from geoemd.loss.sinkhorn_loss import sinkhorn_loss_from_numpy
+from geoemd.emd_eval import EMDWrapper
 
 # backup loss versions of sinkhorn loss:
 # normalize a and b
@@ -19,7 +23,7 @@ from scipy.special import softmax
 # print(a[0, 0])
 # print(b[0, 0])
 # previous version: normalize by dividing by sum
-# a = a_in / torch.sum(a_in, dim=-1)  # .softmax(dim=-1)  # TODO
+# a = a_in / torch.sum(a_in, dim=-1)  # .softmax(dim=-1)
 # b = b_in / torch.sum(b_in, dim=-1)
 # # combined softmax
 # a_len = a_in.size()[-1]
@@ -33,6 +37,47 @@ from scipy.special import softmax
 #     a = together[:, :a_len]
 #     b = together[:, a_len:]
 # print(together.size(), a_in.size(), b_in.size(), a.size(), b.size())
+
+
+class EMDCalibrator(EMDWrapper):
+    def compute_emd(self, res_per_station, norm_factor=8):
+        torch_res, emd_res = [], []
+        for (val_sample, steps_ahead), sample_df in res_per_station.groupby(
+            ["val_sample_ind", "steps_ahead"]
+        ):
+            sample_df = sample_df.sort_values("station")
+            # get corresponding ground truth df
+            gt_df = self.gt_reference.loc[val_sample, steps_ahead].sort_values(
+                "station"
+            )
+
+            # normalize the values as they are normalized in the main training
+            pred_quantile_normed = sample_df["pred_emd"].values / norm_factor
+            gt_quantile_normed = gt_df["gt"].values / norm_factor
+
+            # compute sinkhorn loss
+            torch_res.append(
+                sinkhorn_loss_from_numpy(
+                    np.expand_dims(pred_quantile_normed, 0),
+                    np.expand_dims(gt_quantile_normed, 0),
+                    self.dist_matrix,
+                )
+            )
+
+            # normal normalization is necessary for normal evaluation
+            pred_vals = sample_df["pred_emd"] / sample_df["pred_emd"].sum()
+            gt_vals = gt_df["gt"] / gt_df["gt"].sum()
+            # compute wasserstein
+            was = wasserstein.EMD()
+            emd_res.append(
+                was(
+                    pred_vals,
+                    gt_vals,
+                    self.dist_matrix,
+                )
+            )
+        print("Spearman", round(spearmanr(torch_res, emd_res)[0], 4))
+        return torch_res, emd_res
 
 
 def compare_was(res, iters=300, sinkhorn_kwargs={}):
@@ -104,9 +149,7 @@ def check_pred_gt(res, sinkhorn_kwargs={}):
     #     emd_unnormed.append(was(a, gt_vals, test_cdist))
 
 
-if __name__ == "__main__":
-    import pandas as pd
-
+def old_main_wasserstein_calibration():
     in_path = "outputs/comp_17_05_all/"
     model_path = "0_24_1_nhits_multi_50_3_3_0.csv"
     res_gt = pd.read_csv(in_path + "gt.csv")
@@ -122,3 +165,33 @@ if __name__ == "__main__":
         station_groups, how="left", left_on="group", right_on="station_id"
     )
     compare_was(together)
+
+
+def load_stations(station_path="data/bikes_montreal/test_stations.csv"):
+    return (
+        pd.read_csv(station_path)
+        .sort_values("station_id")
+        .set_index("station_id")
+    )
+
+
+if __name__ == "__main__":
+    comp = "comp_17_06"
+    path = os.path.join("outputs", comp)
+    out_path = os.path.join("outputs", comp + "plots")
+
+    gt_file = [f for f in os.listdir(path) if "None" in f][0]
+    # load gt as reference (per station gt needed for evaluation)
+    single_station_res = pd.read_csv(os.path.join(path, gt_file))
+
+    stations = load_stations()
+    single_station_res = single_station_res[
+        single_station_res["steps_ahead"] == 0
+    ]
+
+    calib = EMDCalibrator(stations, single_station_res.drop("pred", axis=1))
+    torch_res, emd_res = calib(
+        single_station_res, None, mode="station_to_station"
+    )
+    plt.scatter(emd_res, torch_res)
+    plt.show()

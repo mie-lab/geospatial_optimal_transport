@@ -187,14 +187,14 @@ if __name__ == "__main__":
     out_path = os.path.join("outputs", comp + "plots")
     os.makedirs(out_path, exist_ok=True)
 
-    single_station_res = get_singlestations_file(comp_path)
-    correlate_mae_emd(single_station_res, out_path)
-
     # compute normal results
     emd_results = compare_emd(comp_path)
     emd_results.to_csv(os.path.join(out_path, f"results.csv"), index=False)
     loss_comparison(emd_results, out_path)
     make_plots_basic(emd_results, out_path)
+
+    single_station_res = get_singlestations_file(comp_path)
+    correlate_mae_emd(single_station_res, out_path)
 
     # distinguish by steps ahead:
     for steps_ahead in range(3):
