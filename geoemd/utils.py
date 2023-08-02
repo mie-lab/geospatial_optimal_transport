@@ -116,3 +116,14 @@ def create_groups_with_pred(pred, val, step_ahead, station_groups):
         .set_index("group")
     )
     return groups_with_pred
+
+
+def get_dataset_name(in_path_data):
+    if "bikes" in in_path_data:
+        return "bikes"
+    elif "charging" in in_path_data:
+        return "charging"
+    elif "carsharing" in in_path_data:
+        return "carsharing"
+    else:
+        raise ValueError("In path wrong, does not match available dataset")

@@ -122,6 +122,7 @@ def make_plots_basic(results, out_path):
 
 
 def loss_comparison(results, out_path):
+    # first get all the ones with special loss functions
     loss_comparison = results[results["loss"] != "basic"]
     loss_comparison["Method"] = (
         results["loss"]
@@ -131,6 +132,7 @@ def loss_comparison(results, out_path):
         + results["clustering"]
     )
     evaluated_levels = loss_comparison["nr_group"].unique()
+    # Secondly get the ones with basic loss at the same clustering level
     comparative_results = results[
         results["nr_group"].isin(evaluated_levels)
         & (results["loss"] == "basic")
@@ -141,7 +143,7 @@ def loss_comparison(results, out_path):
     loss_comparison = pd.concat([loss_comparison, comparative_results]).dropna()
 
     for var in ["EMD", "MAE", "station-wise MAE"]:
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(10, 10))
         sns.barplot(data=loss_comparison.sort_values([var]), x="Method", y=var)
         if var == "EMD":
             plt.ylim(0, 700)
@@ -149,6 +151,7 @@ def loss_comparison(results, out_path):
             plt.ylim(0, 1.5)
         else:
             plt.ylim(0, 0.75)
+        plt.xticks(rotation=90)
         plt.tight_layout()
         plt.savefig(os.path.join(out_path, f"lossbar_{var}.pdf"))
 

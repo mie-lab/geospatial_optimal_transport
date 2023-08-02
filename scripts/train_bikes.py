@@ -10,7 +10,7 @@ from geoemd.model_wrapper import ModelWrapper, CovariateWrapper
 from geoemd.hierarchy.hierarchy_utils import add_demand_groups
 from geoemd.hierarchy.full_station_hierarchy import FullStationHierarchy
 from geoemd.hierarchy.clustering_hierarchy import SpatialClustering
-from geoemd.utils import argument_parsing, construct_name
+from geoemd.utils import argument_parsing, construct_name, get_dataset_name
 from geoemd.loss.sinkhorn_loss import SinkhornLoss, CombinedLoss
 from geoemd.loss.distribution_loss import StepwiseCrossentropy, DistributionMSE
 from config_bikes import STEPS_AHEAD, TRAIN_CUTOFF, TEST_SAMPLES, MAX_RENTALS
@@ -20,7 +20,7 @@ warnings.filterwarnings("ignore")
 
 np.random.seed(42)
 
-frequency = {"bikes": "1h", "charging": "15min"}
+frequency = {"bikes": "1h", "charging": "15min", "carsharing": "30min"}
 
 
 def clean_single_pred(pred, pred_or_gt="pred", clip=True, apply_exp=False):
@@ -197,7 +197,7 @@ if __name__ == "__main__":
     out_path = args.out_path
     os.makedirs(out_path, exist_ok=True)
 
-    dataset = "bikes" if "bikes" in in_path_data else "charging"
+    dataset = get_dataset_name(in_path_data)
 
     # TODO: set pivot argument of load_data
     demand_agg, stations_locations = load_data(in_path_data, in_path_stations)
@@ -222,7 +222,7 @@ if __name__ == "__main__":
             demand_agg, hierarchy=args.hierarchy
         )
 
-    if dataset == "bikes":
+    if dataset == "bikes" or dataset == "carsharing":
         norm_factor = np.quantile(demand_agg.values, 0.95)
     elif dataset == "charging":
         norm_factor = 3  # at most 3 cars are charging
