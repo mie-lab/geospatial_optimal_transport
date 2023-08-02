@@ -1,5 +1,6 @@
 import os
 import json
+import argparse
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -182,26 +183,46 @@ def correlate_mae_emd(single_station_res, out_path):
 
 
 if __name__ == "__main__":
-    comp = "comp_17_06"
-    comp_path = os.path.join("outputs", comp)
-    out_path = os.path.join("outputs", comp + "plots")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-n", "--name", required=True)
+    parser.add_argument("-p", "--path", type=str, default="outputs")
+    parser.add_argument(
+        "--redo", action="store_true", help="for processing the results again"
+    )
+    parser.add_argument(
+        "--steps",
+        action="store_true",
+        help="process also step 0 1 2 separately",
+    )
+    args = parser.parse_args()
+
+    comp = args.name
+    comp_path = os.path.join(args.path, comp)
+    out_path = os.path.join(args.path, comp + "plots")
     os.makedirs(out_path, exist_ok=True)
 
     # compute normal results
-    emd_results = compare_emd(comp_path)
-    emd_results.to_csv(os.path.join(out_path, f"results.csv"), index=False)
+    if args.redo:
+        emd_results = compare_emd(comp_path)
+        emd_results.to_csv(os.path.join(out_path, f"results.csv"), index=False)
+    else:
+        emd_results = pd.read_csv(os.path.join(out_path, f"results.csv"))
+
+    # compare losses
     loss_comparison(emd_results, out_path)
+    # compare aggregation layers
     make_plots_basic(emd_results, out_path)
 
     single_station_res = get_singlestations_file(comp_path)
     correlate_mae_emd(single_station_res, out_path)
 
     # distinguish by steps ahead:
-    for steps_ahead in range(3):
-        emd_results = compare_emd(
-            os.path.join("outputs", comp), filter_step=steps_ahead
-        )
-        emd_results.to_csv(
-            os.path.join(out_path, f"results_step{steps_ahead}.csv"),
-            index=False,
-        )
+    if args.steps:
+        for steps_ahead in range(3):
+            emd_results = compare_emd(
+                os.path.join(args.path, comp), filter_step=steps_ahead
+            )
+            emd_results.to_csv(
+                os.path.join(out_path, f"results_step{steps_ahead}.csv"),
+                index=False,
+            )
