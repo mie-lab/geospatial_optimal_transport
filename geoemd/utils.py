@@ -1,6 +1,7 @@
 import numpy as np
 import argparse
 import collections
+from geoemd.config import CONFIG
 
 
 def argument_parsing():
@@ -22,6 +23,13 @@ def argument_parsing():
         "--out_path",
         type=str,
         default="outputs/test",
+    )
+    parser.add_argument(
+        "-c",
+        "--config",
+        default=None,
+        type=str,
+        help="One of 'bikes', 'charging', 'carsharing'",
     )
     parser.add_argument("-m", "--model", default="linear", type=str)
     parser.add_argument("--multi_vs_ind", default="multi", type=str)
@@ -47,6 +55,10 @@ def argument_parsing():
 
 def construct_name(args):
     arg_dict = vars(args)
+    # if there is a config, we overwrite all other arguments
+    if args.config is not None:
+        print("Warning: Replacing all training arguments with config")
+        arg_dict.update(CONFIG[args.config])
     # generate save name from the sorted smaller dictionary (wo paths)
     arg_dict_wo_path = arg_dict.copy()
     for path_arg in [
@@ -55,6 +67,7 @@ def construct_name(args):
         "out_path",
         "load_model_name",
         "model_path",
+        "config",
     ]:
         arg_dict_wo_path.pop(path_arg)
     sorted_dict = collections.OrderedDict(sorted(arg_dict_wo_path.items()))
