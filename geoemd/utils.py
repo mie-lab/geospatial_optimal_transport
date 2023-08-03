@@ -47,6 +47,7 @@ def argument_parsing():
     parser.add_argument("--y_cluster_k", type=int, default=10)
     parser.add_argument("--model_path", type=str, default="trained_models")
     parser.add_argument("--load_model_name", type=str, default=None)
+    parser.add_argument("--ordered_samples", action="store_true")
     args = parser.parse_args()
     if args.reconcile > 0:
         assert args.hierarchy != 0
@@ -67,6 +68,7 @@ def construct_name(args):
         "out_path",
         "load_model_name",
         "model_path",
+        "ordered_samples",
         "config",
     ]:
         arg_dict_wo_path.pop(path_arg)

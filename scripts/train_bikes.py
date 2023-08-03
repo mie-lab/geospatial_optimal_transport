@@ -13,7 +13,7 @@ from geoemd.hierarchy.clustering_hierarchy import SpatialClustering
 from geoemd.utils import argument_parsing, construct_name, get_dataset_name
 from geoemd.loss.sinkhorn_loss import SinkhornLoss, CombinedLoss
 from geoemd.loss.distribution_loss import StepwiseCrossentropy, DistributionMSE
-from config_bikes import STEPS_AHEAD, TRAIN_CUTOFF, TEST_SAMPLES, MAX_RENTALS
+from geoemd.config import STEPS_AHEAD, TRAINTEST_SPLIT, TEST_SAMPLES, MAX_COUNT
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -36,7 +36,7 @@ def clean_single_pred(pred, pred_or_gt="pred", clip=True, apply_exp=False):
     if apply_exp:
         result_as_df[pred_or_gt] = np.exp(result_as_df[pred_or_gt])
     if clip:
-        result_as_df[pred_or_gt].clip(0, MAX_RENTALS, inplace=True)
+        result_as_df[pred_or_gt].clip(0, MAX_COUNT, inplace=True)
     return result_as_df
 
 
@@ -76,24 +76,31 @@ def train_and_test(
     model="linear",
     norm_factor=10,
     reconcile=0,
+    ordered_test_samples=False,
     **kwargs,
 ):
     # normalize whole time series
     shared_demand_series = shared_demand_series / norm_factor
 
     # split train and val
-    train_cutoff = int(TRAIN_CUTOFF * len(shared_demand_series))
+    train_cutoff = int(TRAINTEST_SPLIT * len(shared_demand_series))
     train = shared_demand_series[:train_cutoff]
 
     # select TEST_SAMPLES random time points during val time
     assert TEST_SAMPLES < len(shared_demand_series) - train_cutoff - STEPS_AHEAD
     # ensure that the test samples are always the same
     np.random.seed(48)
-    random_val_samples = np.random.choice(
-        np.arange(train_cutoff, len(shared_demand_series) - STEPS_AHEAD),
-        TEST_SAMPLES,
-        replace=False,
-    )
+    # either use sorted val samples, or use independent ones
+    if ordered_test_samples:
+        random_val_samples = np.arange(
+            train_cutoff, train_cutoff + TEST_SAMPLES * 10, STEPS_AHEAD
+        )
+    else:
+        random_val_samples = np.random.choice(
+            np.arange(train_cutoff, len(shared_demand_series) - STEPS_AHEAD),
+            TEST_SAMPLES,
+            replace=False,
+        )
 
     # Add gt
     gt_res_dfs = []
@@ -195,6 +202,7 @@ if __name__ == "__main__":
     in_path_data = args.data_path
     in_path_stations = args.station_path
     out_path = args.out_path
+    ordered_test_samples = args.ordered_samples
     os.makedirs(out_path, exist_ok=True)
 
     dataset = get_dataset_name(in_path_data)
@@ -273,6 +281,7 @@ if __name__ == "__main__":
     train_and_test(
         shared_demand_series,
         norm_factor=norm_factor,
+        ordered_test_samples=ordered_test_samples,
         **training_kwargs,
     )
 
