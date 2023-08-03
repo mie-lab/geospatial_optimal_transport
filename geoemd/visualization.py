@@ -49,3 +49,15 @@ def plot_stations(
         plt.xlabel("Projected x coordinate")
         plt.ylabel("Projected y coordinate")
         plt.savefig(os.path.join(out_path, f"stations_clustered_{k}.csv"))
+
+
+def plot_single_group_ordered(path_ordered_out_file, out_path):
+    out = pd.read_csv(path_ordered_out_file)
+    out["timeslot"] = out["val_sample_ind"] + out["steps_ahead"]
+    groups = out["group"].unique()
+    print("Plotting over time for group", groups[0])
+    plot_out = out[out["group"] == groups[0]]
+    plt.plot(plot_out["timeslot"], plot_out["gt"], label="gt")
+    plt.plot(plot_out["timeslot"], plot_out["pred"], label="pred")
+    plt.legend()
+    plt.savefig(os.path.join(out_path, "group_over_time.pdf"))
