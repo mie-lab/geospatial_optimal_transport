@@ -93,6 +93,29 @@ def make_test_excerpt(demand_df, stations, reset_station_ids=False):
     return excerpt, stations_pruned
 
 
+def make_arbitrary_excerpt(
+    start_date="2015-01-01", end_date="2015-31-12", out_name="2015"
+):
+    demand_df = pd.read_csv("data/bikes_montreal/pickup.csv")
+    stations = pd.read_csv("data/bikes_montreal/stations.csv")
+    demand_df.sort_values("timeslot", inplace=True)
+    # reduce to the demand in the timeframe
+    excerpt = demand_df[
+        (demand_df["timeslot"] > start_date)
+        & (demand_df["timeslot"] < end_date)
+    ]
+    # reduce to occuring stations
+    occurring_ids = excerpt["station_id"].unique()
+    stations_pruned = stations[stations["station_id"].isin(occurring_ids)]
+    # save
+    print(excerpt["timeslot"].min(), excerpt["timeslot"].max())
+    stations_pruned.to_csv(
+        f"data/bikes_montreal/stations_{out_name}.csv", index=False
+    )
+    excerpt.to_csv(f"data/bikes_montreal/data_{out_name}.csv", index=False)
+    print("Excerpt saved!")
+
+
 def load_demand(
     base_path="data/bikes_montreal", station_code_mapping={}, agg_by="1h"
 ):
@@ -287,6 +310,9 @@ def to_csv_td(df, out_path, time_col=["timeslot"]):
 
 
 if __name__ == "__main__":
+    # make_arbitrary_excerpt()
+    # exit()
+
     station_df, station_code_mapping = load_stations()
     station_df = project_locations(station_df)
     pickup, dropoff = load_demand(station_code_mapping=station_code_mapping)
