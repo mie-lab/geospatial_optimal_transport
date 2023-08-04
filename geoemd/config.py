@@ -27,7 +27,7 @@ CONFIG = {
         "model": "lightgbm",
         "multi_vs_ind": "multi",
         "lags": 12,
-        "output_chunk_length": 3,
+        "output_chunk_length": 6,
         "lags_past_covariates": 1,
         "x_scale": 1,
         "reconcile": 0,
