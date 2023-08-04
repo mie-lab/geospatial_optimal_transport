@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 plt.rcParams.update({"font.size": 15})
 
 from geoemd.emd_eval import EMDWrapper
+from geoemd.utils import get_dataset_name
+from geoemd.config import STATION_PATH
 
 
 def get_singlestations_file(path):
@@ -18,7 +20,8 @@ def get_singlestations_file(path):
     return gt_reference
 
 
-def load_stations(station_path="data/bikes_montreal/test_stations.csv"):
+def load_stations(dataset):
+    station_path = STATION_PATH[dataset]
     return (
         pd.read_csv(station_path)
         .sort_values("station_id")
@@ -29,7 +32,7 @@ def load_stations(station_path="data/bikes_montreal/test_stations.csv"):
 def compare_emd(path, filter_step=-1, emd_mode="station_to_station"):
     gt_reference = get_singlestations_file(path).drop("pred", axis=1)
     # load stations
-    stations = load_stations()
+    stations = load_stations(DATASET)
     if filter_step > 0:
         gt_reference = gt_reference[gt_reference["steps_ahead"] == filter_step]
 
@@ -124,6 +127,9 @@ def make_plots_basic(results, out_path):
 def loss_comparison(results, out_path):
     # first get all the ones with special loss functions
     loss_comparison = results[results["loss"] != "basic"]
+    if len(loss_comparison) == 0:
+        print("No loss comparison because no special losses are used")
+        return 1
     loss_comparison["Method"] = (
         results["loss"]
         + "_"
@@ -157,7 +163,7 @@ def loss_comparison(results, out_path):
 
 
 def correlate_mae_emd(single_station_res, out_path):
-    stations = load_stations()
+    stations = load_stations(DATASET)
     # ger error
     single_station_res["MAE"] = (
         single_station_res["gt"] - single_station_res["pred"]
@@ -203,6 +209,8 @@ if __name__ == "__main__":
     comp_path = os.path.join(args.path, comp)
     out_path = os.path.join(args.path, comp + "plots")
     os.makedirs(out_path, exist_ok=True)
+
+    DATASET = get_dataset_name(comp)
 
     # compute normal results
     if args.redo:

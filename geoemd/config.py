@@ -24,12 +24,24 @@ CONFIG = {
         "reconcile": 0,
     },
     "carsharing": {
-        "model": "lightgbm",
-        "multi_vs_ind": "multi",
+        # "model": "lightgbm",
+        # "multi_vs_ind": "multi",
+        # "lags": 12,
+        # "output_chunk_length": 6,
+        # "lags_past_covariates": 1,
+        "model": "linear",
+        "multi_vs_ind": "ind",
         "lags": 12,
-        "output_chunk_length": 6,
-        "lags_past_covariates": 1,
+        "output_chunk_length": 3,
+        "lags_past_covariates": 0,
         "x_scale": 1,
         "reconcile": 0,
     },
+}
+
+
+STATION_PATH = {
+    "bikes": "data/bikes_montreal/test_stations.csv",
+    "carsharing": "data/carsharing/zurich_stations.csv",
+    "charging": "data/charging_stations/stations.csv",
 }
