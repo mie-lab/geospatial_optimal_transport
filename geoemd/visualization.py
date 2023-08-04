@@ -51,13 +51,30 @@ def plot_stations(
         plt.savefig(os.path.join(out_path, f"stations_clustered_{k}.csv"))
 
 
-def plot_single_group_ordered(path_ordered_out_file, out_path):
+def plot_single_group_ordered(path_ordered_out_file, out_path, horizon=2):
     out = pd.read_csv(path_ordered_out_file)
-    out["timeslot"] = out["val_sample_ind"] + out["steps_ahead"]
+    # version 1: using always the three predictions, then redo prediction
+    # out["timeslot"] = out["val_sample_ind"] + out["steps_ahead"]
+    # version 2: using always the three steps ahead prediction
+    out = out[out["steps_ahead"] == horizon]
+    out["timeslot"] = out["val_sample_ind"]
+
     groups = out["group"].unique()
     print("Plotting over time for group", groups[0])
     plot_out = out[out["group"] == groups[0]]
+
+    plt.figure(figsize=(8, 5))
     plt.plot(plot_out["timeslot"], plot_out["gt"], label="gt")
     plt.plot(plot_out["timeslot"], plot_out["pred"], label="pred")
     plt.legend()
-    plt.savefig(os.path.join(out_path, "group_over_time.pdf"))
+    plt.savefig(out_path)
+
+
+if __name__ == "__main__":
+    path = "outputs/ordered_04_08"
+    for f in os.listdir(path):
+        if f[-3:] != "csv":
+            continue
+        plot_single_group_ordered(
+            os.path.join(path, f), os.path.join(path, f[:-4] + "_plot.png")
+        )

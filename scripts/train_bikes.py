@@ -92,8 +92,9 @@ def train_and_test(
     np.random.seed(48)
     # either use sorted val samples, or use independent ones
     if ordered_test_samples:
+        # at every step, we predict x steps ahead
         random_val_samples = np.arange(
-            train_cutoff, train_cutoff + TEST_SAMPLES * 10, STEPS_AHEAD
+            train_cutoff, train_cutoff + TEST_SAMPLES * 5  # , STEPS_AHEAD
         )
     else:
         random_val_samples = np.random.choice(
