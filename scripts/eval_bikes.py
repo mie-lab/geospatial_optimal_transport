@@ -10,7 +10,8 @@ plt.rcParams.update({"font.size": 15})
 
 from geoemd.emd_eval import EMDWrapper
 from geoemd.utils import get_dataset_name
-from geoemd.config import STATION_PATH
+from geoemd.config import STATION_PATH, DATA_PATH, TRAINTEST_SPLIT
+from geoemd.hierarchy.hierarchy_utils import add_fraction_to_hierarchy
 
 
 def get_singlestations_file(path):
@@ -29,12 +30,23 @@ def load_stations(dataset):
     )
 
 
-def compare_emd(path, filter_step=-1, emd_mode="station_to_station"):
+def compare_emd(
+    path, filter_step=-1, emd_mode="station_to_station", split_by_fraction=True
+):
     gt_reference = get_singlestations_file(path).drop("pred", axis=1)
     # load stations
     stations = load_stations(DATASET)
     if filter_step > 0:
         gt_reference = gt_reference[gt_reference["steps_ahead"] == filter_step]
+    # if we want to add the fraction, we need to load the raw training data
+    if split_by_fraction:
+        data = pd.read_csv(DATA_PATH[DATASET])
+        # pivot
+        data = data.pivot(
+            index="timeslot", columns="station_id", values="count"
+        ).fillna(0)
+        # reduce to training data
+        data = data[: int(TRAINTEST_SPLIT * len(data))]
 
     emd_results = []
     for f in os.listdir(path):
@@ -71,6 +83,9 @@ def compare_emd(path, filter_step=-1, emd_mode="station_to_station"):
                 os.path.join(path, f[:-4] + "_hierarchy.json"), "r"
             ) as infile:
                 res_hierarchy = json.load(infile)
+            # split by fraction
+            if split_by_fraction:
+                res_hierarchy = add_fraction_to_hierarchy(res_hierarchy, data)
             # compute number of stations per group
             nr_stations_per_group = pd.Series(
                 {k: len(v) for k, v in res_hierarchy.items()}

@@ -10,6 +10,7 @@ __pycache__/
 .vscode
 
 # project specific
+*.sh
 deprecated.py
 backups/
 data/

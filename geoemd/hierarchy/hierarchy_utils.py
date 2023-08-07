@@ -44,12 +44,32 @@ def hierarchy_to_df(res_hierarchy):
         if group == "total":
             continue
         df = pd.DataFrame()
-        df["station"] = stations_in_group
+        if type(stations_in_group) == dict:
+            df["station"] = stations_in_group.keys()
+            df["station_fraction"] = stations_in_group.values()
+        else:
+            df["station"] = stations_in_group
         df["group"] = group
         df["nr_stations"] = len(stations_in_group)
         station_group_df.append(df)
     station_group_df = pd.concat(station_group_df).sort_values("station")
     return station_group_df
+
+
+def add_fraction_to_hierarchy(res_hierarchy, train_data):
+    # initialize hierachy
+    hierarchy_with_fractions = {}
+    for group_id, group_stations in res_hierarchy.items():
+        hierarchy_with_fractions[group_id] = {}
+        if group_id != "total":
+            train_data[group_id] = train_data[group_stations].sum(axis=1)
+            for station in group_stations:
+                # TODO: the better version would be (data[station] /
+                # data[group_id]).mean(), but leads to zero division
+                hierarchy_with_fractions[group_id][station] = (
+                    train_data[station].sum() / train_data[group_id].sum()
+                )
+    return hierarchy_with_fractions
 
 
 # # Deprecated

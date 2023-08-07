@@ -41,7 +41,13 @@ CONFIG = {
 
 
 STATION_PATH = {
-    "bikes": "data/bikes_montreal/test_stations.csv",
+    "bikes": "data/bikes/test_stations.csv",
     "carsharing": "data/carsharing/zurich_stations.csv",
-    "charging": "data/charging_stations/stations.csv",
+    "charging": "data/charging/stations.csv",
+}
+
+DATA_PATH = {
+    "bikes": "data/bikes/test_pickup.csv",
+    "carsharing": "data/carsharing/zurich_data.csv",
+    "charging": "data/charging/test_data.csv",
 }

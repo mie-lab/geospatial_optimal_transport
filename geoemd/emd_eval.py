@@ -61,9 +61,17 @@ class EMDWrapper:
                 left_on="group",
                 right_on="group",
             )
-            res_per_station["pred_emd"] = (
-                res_per_station["pred"] / res_per_station["nr_stations"]
-            )
+            # if we have the information what fraction each station has, use it
+            if "station_fraction" in station_group_df.columns:
+                res_per_station["pred_emd"] = (
+                    res_per_station["pred"]
+                    * res_per_station["station_fraction"]
+                )
+            else:
+                # otherwise, just take the same fraction for every station
+                res_per_station["pred_emd"] = (
+                    res_per_station["pred"] / res_per_station["nr_stations"]
+                )
         # compute EMD
         return self.compute_emd(res_per_station)
 
