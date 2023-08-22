@@ -6,7 +6,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-plt.rcParams.update({"font.size": 15})
+plt.rcParams.update({"font.size": 20})
 
 from geoemd.emd_eval import EMDWrapper
 from geoemd.utils import get_dataset_name
@@ -70,10 +70,10 @@ def compare_emd(
         res["error"] = (res["gt"] - res["pred"]).abs()
 
         # retrieve clustering method and groups from the file name
-        clustering_method = f[:-4].split("_")[-1]
+        clustering_method = [f[:-4].split("_")[-1]]
         nr_groups = int(f.split("_")[-2])
-        if clustering_method == "None":
-            clustering_method = "agg"
+        if clustering_method[0] == "None":
+            clustering_method = ["agg", "kmeans"]  # add both
             nr_groups = len(stations)
             res_hierarchy = None
             res["station_wise_error"] = res["error"]
@@ -104,20 +104,22 @@ def compare_emd(
         emd_compute = EMDWrapper(stations, gt_reference)
         emd = emd_compute(res, res_hierarchy, mode=emd_mode)["EMD"].values
 
-        emd_results.append(
-            {
-                "name": f[:-4],
-                "nr_group": nr_groups,
-                "clustering": clustering_method,
-                "loss": loss_fn,
-                "EMD": np.mean(emd),
-                "EMD_std": np.std(emd),
-                "MAE": res["error"].mean(),
-                "MAE std": res["error"].std(),
-                "station-wise MAE": res["station_wise_error"].mean(),
-                "station-wise MAE std": res["station_wise_error"].std(),
-            }
-        )
+        # trick to add the result two times if the clustering method is None
+        for cluster_method in clustering_method:
+            emd_results.append(
+                {
+                    "name": f[:-4],
+                    "nr_group": nr_groups,
+                    "clustering": cluster_method,
+                    "loss": loss_fn,
+                    "EMD": np.mean(emd),
+                    "EMD_std": np.std(emd),
+                    "MAE": res["error"].mean(),
+                    "MAE std": res["error"].std(),
+                    "station-wise MAE": res["station_wise_error"].mean(),
+                    "station-wise MAE std": res["station_wise_error"].std(),
+                }
+            )
         print(emd_results[-1])
     emd_results = pd.DataFrame(emd_results)
     return emd_results
@@ -128,6 +130,9 @@ def make_plots_basic(results, out_path):
     assert len(
         basic_results.drop_duplicates(subset=["nr_group", "clustering"])
     ) == len(basic_results)
+    results["clustering"] = results["clustering"].map(
+        {"kmeans": "K-Means", "agg": "agglomerative"}
+    )
 
     for var in ["EMD", "MAE", "station-wise MAE"]:
         plt.figure(figsize=(8, 5))
@@ -198,7 +203,7 @@ def correlate_mae_emd(single_station_res, out_path):
         left_index=True,
         right_on=["val_sample_ind", "steps_ahead"],
     )
-    plt.figure(figsize=(6, 6))
+    plt.figure(figsize=(6, 4))
     plt.scatter(together["MAE"], together["EMD"])
     plt.ylabel("EMD")
     plt.xlabel("MAE")
@@ -214,24 +219,29 @@ if __name__ == "__main__":
         "--redo", action="store_true", help="for processing the results again"
     )
     parser.add_argument(
-        "--steps",
-        action="store_true",
-        help="process also step 0 1 2 separately",
+        "--steps_ahead",
+        default=-1,
+        type=int,
+        help="filter for one specific step-ahead",
     )
     args = parser.parse_args()
 
     comp = args.name
     comp_path = os.path.join(args.path, comp)
-    out_path = os.path.join(args.path, comp + "plots")
+    out_plot_name = (
+        "plots" if args.steps_ahead == -1 else "plots" + str(args.steps_ahead)
+    )
+    out_path = os.path.join(args.path, comp + "_" + out_plot_name)
     os.makedirs(out_path, exist_ok=True)
 
     DATASET = get_dataset_name(comp)
 
     # compute normal results
-    if args.redo:
-        emd_results = compare_emd(comp_path)
+    if args.redo or not os.path.exists(out_path):
+        emd_results = compare_emd(comp_path, filter_step=args.steps_ahead)
         emd_results.to_csv(os.path.join(out_path, f"results.csv"), index=False)
     else:
+        # if they already exist, load results
         emd_results = pd.read_csv(os.path.join(out_path, f"results.csv"))
 
     # compare losses
@@ -241,14 +251,3 @@ if __name__ == "__main__":
 
     single_station_res = get_singlestations_file(comp_path)
     correlate_mae_emd(single_station_res, out_path)
-
-    # distinguish by steps ahead:
-    if args.steps:
-        for steps_ahead in range(3):
-            emd_results = compare_emd(
-                os.path.join(args.path, comp), filter_step=steps_ahead
-            )
-            emd_results.to_csv(
-                os.path.join(out_path, f"results_step{steps_ahead}.csv"),
-                index=False,
-            )
