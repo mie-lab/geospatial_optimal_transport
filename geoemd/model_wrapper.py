@@ -5,13 +5,14 @@ from darts.models import (
     LinearRegressionModel,
     XGBModel,
     NHiTSModel,
-    Croston,
+    ExponentialSmoothing,
     LightGBMModel,
 )
 from darts.utils.timeseries_generation import (
     datetime_attribute_timeseries as dt_attr,
 )
 from darts.dataprocessing.transformers import Scaler
+from geoemd.baseline_models import LastStepModel
 
 
 class CovariateWrapper:
@@ -66,6 +67,7 @@ class ModelWrapper:
     ) -> None:
         # store model args
         self.model_args = kwargs
+        self.model_class = model_class
         # set working directory
         self.work_dir = os.path.join(
             self.model_args["model_path"], self.model_args["model_name"]
@@ -109,17 +111,23 @@ class ModelWrapper:
         elif model_class == "xgb":
             ModelClass = XGBModel
             model_kwargs = {"lags": self.model_args["lags"]}
+        elif model_class == "laststep":
+            ModelClass = LastStepModel
+            model_kwargs = {}
+        elif model_class == "exponential":
+            ModelClass = ExponentialSmoothing
+            model_kwargs = {}
         else:
             raise ValueError("Model name unknown")
 
         # add past covariates for all of them
-        if model_class != "nhits":
+        if model_class not in ["nhits", "exponential"]:
             model_kwargs["lags_past_covariates"] = self.model_args[
                 "lags_past_covariates"
             ]
-        model_kwargs["output_chunk_length"] = self.model_args[
-            "output_chunk_length"
-        ]
+            model_kwargs["output_chunk_length"] = self.model_args[
+                "output_chunk_length"
+            ]
 
         # add loss function
         if "loss_fn" in self.model_args:
@@ -140,12 +148,18 @@ class ModelWrapper:
         self.covariate_wrapper = covariate_wrapper
 
     def fit(self, series):
-        self.model.fit(
-            series,
-            past_covariates=self.covariate_wrapper.get_train_covariates(),
-        )
+        if self.model_class == "exponential":
+            self.model.fit(series)
+        else:
+            self.model.fit(
+                series,
+                past_covariates=self.covariate_wrapper.get_train_covariates(),
+            )
 
     def predict(self, n, series, val_index):
+        if self.model_class == "exponential":
+            pred = self.model.predict(n=n, series=series)
+            return pred
         pred = self.model.predict(
             n=n,
             series=series,

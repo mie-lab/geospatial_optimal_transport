@@ -36,18 +36,36 @@ CONFIG = {
         "lags_past_covariates": 0,
         "x_scale": 1,
         "reconcile": 0,
+        "nhits_model_kwargs": {
+            "input_chunk_length": 65,  # self.model_args["lags"],
+            "n_epochs": 200,  # self.model_args["n_epochs"],
+            "num_stacks": 8,  # self.model_args["num_stacks"],
+            "optimizer_kwargs": {"lr": 0.000272},
+            "dropout": 0.03988,
+            "num_blocks": 1,
+            "layer_widths": [256, 128, 128, 512, 128, 512, 512, 512],
+            "num_layers": 4,
+            "pooling_kernel_sizes": [[8], [8], [4], [4], [2], [2], [1], [1]],
+            "n_freq_downsample": [[8], [8], [4], [4], [2], [2], [1], [1]],
+            "activation": "ReLU",
+            "MaxPool1d": True,
+            "output_chunk_length": 48,
+            "log_tensorboard": True,
+        },
     },
 }
 
 
 STATION_PATH = {
     "bikes": "data/bikes/test_stations.csv",
+    "bikes_2015": "data/bikes/stations_2015.csv",
     "carsharing": "data/carsharing/zurich_stations.csv",
     "charging": "data/charging/stations.csv",
 }
 
 DATA_PATH = {
     "bikes": "data/bikes/test_pickup.csv",
+    "bikes_2015": "data/bikes/data_2015.csv",
     "carsharing": "data/carsharing/zurich_data.csv",
     "charging": "data/charging/test_data.csv",
 }
