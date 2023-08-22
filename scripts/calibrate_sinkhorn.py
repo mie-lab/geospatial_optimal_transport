@@ -154,7 +154,7 @@ def old_main_wasserstein_calibration():
     model_path = "0_24_1_nhits_multi_50_3_3_0.csv"
     res_gt = pd.read_csv(in_path + "gt.csv")
     res_pred = pd.read_csv(in_path + model_path)
-    station_groups = pd.read_csv("data/bikes_montreal/test_stations.csv")
+    station_groups = pd.read_csv("data/bikes/test_stations.csv")
     together = res_pred.merge(
         res_gt,
         left_on=["group", "steps_ahead", "val_sample_ind"],
@@ -167,7 +167,7 @@ def old_main_wasserstein_calibration():
     compare_was(together)
 
 
-def load_stations(station_path="data/bikes_montreal/test_stations.csv"):
+def load_stations(station_path="data/bikes/test_stations.csv"):
     return (
         pd.read_csv(station_path)
         .sort_values("station_id")
@@ -176,7 +176,7 @@ def load_stations(station_path="data/bikes_montreal/test_stations.csv"):
 
 
 if __name__ == "__main__":
-    comp = "comp_17_06"
+    comp = "bikes_cluster_17_06"
     path = os.path.join("outputs", comp)
     out_path = os.path.join("outputs", comp + "plots")
 

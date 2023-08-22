@@ -134,7 +134,9 @@ def create_groups_with_pred(pred, val, step_ahead, station_groups):
 
 
 def get_dataset_name(in_path_data):
-    if "bikes" in in_path_data:
+    if "bikes" in in_path_data and "2015" in in_path_data:
+        return "bikes_2015"
+    elif "bikes" in in_path_data:
         return "bikes"
     elif "charging" in in_path_data:
         return "charging"
