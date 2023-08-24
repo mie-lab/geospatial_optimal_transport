@@ -125,6 +125,7 @@ class ModelWrapper:
             model_kwargs["lags_past_covariates"] = self.model_args[
                 "lags_past_covariates"
             ]
+        if model_class not in ["exponential"]:
             model_kwargs["output_chunk_length"] = self.model_args[
                 "output_chunk_length"
             ]
