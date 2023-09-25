@@ -7,6 +7,7 @@ from darts.models import (
     NHiTSModel,
     ExponentialSmoothing,
     LightGBMModel,
+    NBEATSModel,
 )
 from darts.utils.timeseries_generation import (
     datetime_attribute_timeseries as dt_attr,

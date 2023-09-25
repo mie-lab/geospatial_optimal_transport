@@ -69,3 +69,5 @@ DATA_PATH = {
     "carsharing": "data/carsharing/zurich_data.csv",
     "charging": "data/charging/test_data.csv",
 }
+
+SPEED_FACTOR = {"bikes": 10, "bikes_2015": 10, "carsharing": 10, "charging": 10}

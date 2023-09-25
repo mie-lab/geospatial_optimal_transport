@@ -144,3 +144,42 @@ def get_dataset_name(in_path_data):
         return "carsharing"
     else:
         raise ValueError("In path wrong, does not match available dataset")
+
+
+def spacetime_cost_matrix(
+    dist_matrix,
+    time_steps=3,
+    speed_factor=10,
+    forward_cost=0,
+    backward_cost=1,
+):
+    """
+    Design a space-time cost matrix that quantifies the cost across space and time
+    dist_matrix: pairwise distances in m
+    speed_factor: relocation speed of users (in km/h)
+    forward_cost: cost for using demand that was originally allocated for the
+    preceding timestep (usually low) - in hours
+    backward_cost: cost for using demand that was allocated for the next timestep - in hours
+    """
+    nr_stations = len(dist_matrix)
+
+    time_matrix = dist_matrix / speed_factor
+
+    final_cost_matrix = np.zeros(
+        (time_steps * nr_stations, time_steps * nr_stations)
+    )
+    for t_pred in range(time_steps):
+        for t_gt in range(time_steps):
+            start_x, end_x = (t_pred * nr_stations, (t_pred + 1) * nr_stations)
+            start_y, end_y = (t_gt * nr_stations, (t_gt + 1) * nr_stations)
+            if t_pred > t_gt:
+                waiting_time = (t_pred - t_gt) * backward_cost
+                final_cost_matrix[start_x:end_x, start_y:end_y] = np.maximum(
+                    time_matrix, waiting_time * np.ones(time_matrix.shape)
+                )
+            else:
+                waiting_time = (t_gt - t_pred) * forward_cost
+                final_cost_matrix[start_x:end_x, start_y:end_y] = np.maximum(
+                    time_matrix, waiting_time * np.ones(time_matrix.shape)
+                )
+    return final_cost_matrix

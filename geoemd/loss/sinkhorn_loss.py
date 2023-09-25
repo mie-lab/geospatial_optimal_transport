@@ -40,15 +40,18 @@ class SinkhornLoss:
     def get_cost(self, a, b):
         return self.cost_matrix
 
-    def __call__(self, a_in, b_in):
-        """a_in: predictions, b_in: targets"""
-        # Adapt cost matrix size to the batch size
-        batch_size = a_in.size()[0]
+    def adapt_to_batchsize(self, batch_size):
         if self.cost_matrix.size()[0] != batch_size:
             self.cost_matrix = self.cost_matrix_original.repeat(
                 (batch_size, 1, 1)
             )
             self.dummy_locs = self.dummy_locs_orig.repeat((batch_size, 1, 1))
+
+    def __call__(self, a_in, b_in):
+        """a_in: predictions, b_in: targets"""
+        # Adapt cost matrix size to the batch size
+        batch_size = a_in.size()[0]
+        self.adapt_to_batchsize(batch_size)
 
         # this yields a spearman correlation of 0.74
         a = (a_in * 2.71828).softmax(dim=-1)
@@ -71,10 +74,38 @@ class SinkhornLoss:
         return torch.sum(loss)
 
 
+class SinkhornSpatiotemporal(SinkhornLoss):
+    def __call__(self, a_in, b_in):
+        assert (
+            a_in.dim() == 3
+        ), "a_in must be of size (batch_size, time_steps, nr_stations)"
+
+        # Adapt cost matrix size to the batch size
+        batch_size = a_in.size()[0]
+        self.adapt_to_batchsize(batch_size)
+
+        # normalize over station-axis first --> station predictions sum to 1
+        a = (a_in * 2.71828).softmax(dim=-1)
+        b = b_in / torch.unsqueeze(torch.sum(b_in, dim=-1), b_in.dim() - 1)
+        # then reshape -> flatten space-time axes
+        a = a.reshape((a_in.size()[0], -1))
+        b = b.reshape((b_in.size()[0], -1))
+
+        # normalize again such that it overall sums up to 1
+        a = a / torch.unsqueeze(torch.sum(a, dim=-1), a.dim() - 1)
+        b = b / torch.unsqueeze(torch.sum(b, dim=-1), b.dim() - 1)
+
+        loss = self.loss_object(a, self.dummy_locs, b, self.dummy_locs)
+        return torch.sum(loss)
+
+
 class CombinedLoss:
-    def __init__(self, C, dist_weight=0.9) -> None:
+    def __init__(self, C, dist_weight=0.9, spatiotemporal=False) -> None:
         self.standard_mse = MSELoss()
-        self.sinkhorn_error = SinkhornLoss(C)
+        if spatiotemporal:
+            self.sinkhorn_error = SinkhornSpatiotemporal(C)
+        else:
+            self.sinkhorn_error = SinkhornLoss(C)
         self.dist_weight = dist_weight
 
     def __call__(self, a_in, b_in):

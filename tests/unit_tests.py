@@ -1,4 +1,5 @@
 import numpy as np
+from geoemd.utils import spacetime_cost_matrix
 
 
 def test_hierarchy(hier, demand_agg, station_groups, stations_locations):
@@ -37,3 +38,34 @@ def test_hierarchy(hier, demand_agg, station_groups, stations_locations):
         .values,
         0,
     )
+
+
+def test_spacetime_cost_matrix():
+    nr_stations = 10
+    # design pairwise distance matrix with at most 10km distance
+    dist_matrix = np.random.rand(nr_stations, nr_stations) * 10
+    final_cost_matrix = spacetime_cost_matrix(dist_matrix)
+    print(final_cost_matrix.shape)
+
+    x, y = (5, 25)
+    s1, s2 = x % nr_stations, y % nr_stations
+    t1, t2 = x // nr_stations, y // nr_stations
+    print(f"pred - station {s1} time {t1}, gt - station {s2} time {t2}")
+    print(final_cost_matrix[x, y])
+
+    # # single-cell version to compute the same value
+    # final_cost_matrix_v2 = np.zeros((time_steps * nr_stations, time_steps * nr_stations))
+    # for x in range(len(final_cost_matrix_v2)):
+    #     for y in range(len(final_cost_matrix_v2)):
+    #         # get station numbers
+    #         s_pred, s_gt = x%nr_stations, y%nr_stations
+    #         t_pred, t_gt = x//nr_stations, y//nr_stations
+    #         relocation_time = time_matrix[s_pred, s_gt]
+    #         # if the time where we are relocating to (t2) is higher, we don't have many costs, we just use demand later that we estimated for now
+    #         waiting_time = (t_gt - t_pred) * forward_cost if t_gt >= t_pred else (t_pred - t_gt) * backward_cost
+
+    #         final_cost_matrix_v2[x, y] = max([waiting_time, relocation_time])
+    # #         print(x, y, waiting_time, relocation_time)
+
+
+test_spacetime_cost_matrix()

@@ -10,12 +10,24 @@ from geoemd.model_wrapper import ModelWrapper, CovariateWrapper
 from geoemd.hierarchy.hierarchy_utils import add_demand_groups
 from geoemd.hierarchy.full_station_hierarchy import FullStationHierarchy
 from geoemd.hierarchy.clustering_hierarchy import SpatialClustering
-from geoemd.utils import argument_parsing, construct_name, get_dataset_name
+from geoemd.utils import (
+    argument_parsing,
+    construct_name,
+    get_dataset_name,
+    spacetime_cost_matrix,
+)
 from geoemd.loss.sinkhorn_loss import SinkhornLoss, CombinedLoss
 from geoemd.loss.distribution_loss import StepwiseCrossentropy, DistributionMSE
-from geoemd.config import STEPS_AHEAD, TRAINTEST_SPLIT, TEST_SAMPLES, MAX_COUNT
+from geoemd.config import (
+    STEPS_AHEAD,
+    TRAINTEST_SPLIT,
+    TEST_SAMPLES,
+    MAX_COUNT,
+    SPEED_FACTOR,
+)
 import warnings
 
+DEBUG = False
 warnings.filterwarnings("ignore")
 
 np.random.seed(42)
@@ -139,6 +151,9 @@ def train_and_test(
             regr = ModelWrapper(model, covariate_wrapper, **kwargs)
             regr.fit(train[component])
             fitted_models.append(regr)
+
+    if DEBUG:
+        exit()
 
     # predict
     model_res_dfs = []
@@ -271,8 +286,20 @@ if __name__ == "__main__":
             training_kwargs["loss_fn"] = SinkhornLoss(station_cdist)
         elif args.x_loss_function == "combinedsinkhorn":
             training_kwargs["loss_fn"] = CombinedLoss(station_cdist)
+        elif args.x_loss_function == "sinkhorntemporal":
+            # actually combined sinkhorn temporal
+            spatiotemporal_cost = spacetime_cost_matrix(
+                station_cdist,
+                time_steps=STEPS_AHEAD,
+                speed_factor=SPEED_FACTOR[dataset],
+            )
+            training_kwargs["loss_fn"] = CombinedLoss(
+                spatiotemporal_cost, spatiotemporal=True
+            )
         else:
-            raise NotImplementedError("Must be sinkhorn or combinedsinkhorn")
+            raise NotImplementedError(
+                "Must be sinkhorn, sinkhorntemporal or combinedsinkhorn"
+            )
     elif args.x_loss_function == "distribution":
         training_kwargs["loss_fn"] = DistributionMSE()
     elif args.x_loss_function == "crossentropy":
