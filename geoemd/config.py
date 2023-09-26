@@ -70,4 +70,11 @@ DATA_PATH = {
     "charging": "data/charging/test_data.csv",
 }
 
+FREQUENCY = {
+    "bikes": "1h",
+    "bikes_2015": "1h",
+    "charging": "15min",
+    "carsharing": "30min",
+}
+
 SPEED_FACTOR = {"bikes": 10, "bikes_2015": 10, "carsharing": 10, "charging": 10}

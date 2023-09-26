@@ -16,7 +16,7 @@ from geoemd.utils import (
     get_dataset_name,
     spacetime_cost_matrix,
 )
-from geoemd.loss.sinkhorn_loss import SinkhornLoss, CombinedLoss
+from geoemd.loss.sinkhorn_loss import SinkhornUnbalanced, CombinedLoss
 from geoemd.loss.distribution_loss import StepwiseCrossentropy, DistributionMSE
 from geoemd.config import (
     STEPS_AHEAD,
@@ -24,6 +24,7 @@ from geoemd.config import (
     TEST_SAMPLES,
     MAX_COUNT,
     SPEED_FACTOR,
+    FREQUENCY,
 )
 import warnings
 
@@ -31,8 +32,6 @@ DEBUG = False
 warnings.filterwarnings("ignore")
 
 np.random.seed(42)
-
-frequency = {"bikes": "1h", "charging": "15min", "carsharing": "30min"}
 
 
 def clean_single_pred(pred, pred_or_gt="pred", clip=True, apply_exp=False):
@@ -246,7 +245,7 @@ if __name__ == "__main__":
             demand_agg, hierarchy=args.hierarchy
         )
 
-    if dataset == "bikes" or dataset == "carsharing":
+    if dataset in ["bikes", "bikes_2015", "carsharing"]:
         norm_factor = np.quantile(demand_agg.values, 0.95)
     elif dataset == "charging":
         norm_factor = 3  # at most 3 cars are charging
@@ -258,19 +257,19 @@ if __name__ == "__main__":
         # initialize time series with hierarchy
         shared_demand_series = TimeSeries.from_dataframe(
             demand_agg,
-            freq=frequency[dataset],
+            freq=FREQUENCY[dataset],
             hierarchy=station_hierarchy.get_darts_hier(),
             fillna_value=0,
         )
     else:
         shared_demand_series = TimeSeries.from_dataframe(
-            demand_agg, freq=frequency[dataset], fillna_value=0
+            demand_agg, freq=FREQUENCY[dataset], fillna_value=0
         )
 
     out_name, training_kwargs = construct_name(args)
 
     # Initialize loss function
-    if "sinkhorn" in args.x_loss_function:
+    if "emd" in args.x_loss_function:
         # sort stations by the same order as the demand columns
         if args.y_clustermethod is not None:
             station_coords = station_hierarchy.groups_coordinates.loc[
@@ -282,28 +281,38 @@ if __name__ == "__main__":
             ].values
         station_cdist = cdist(station_coords, station_coords)
         station_cdist = station_cdist / np.max(station_cdist)
-        if args.x_loss_function == "sinkhorn":
-            training_kwargs["loss_fn"] = SinkhornLoss(station_cdist)
-        elif args.x_loss_function == "combinedsinkhorn":
-            training_kwargs["loss_fn"] = CombinedLoss(station_cdist)
-        elif args.x_loss_function == "sinkhorntemporal":
-            # actually combined sinkhorn temporal
+        if "temporal" in args.x_loss_function:
             spatiotemporal_cost = spacetime_cost_matrix(
                 station_cdist,
                 time_steps=STEPS_AHEAD,
                 speed_factor=SPEED_FACTOR[dataset],
             )
+        if args.x_loss_function == "emdbalancedspatial":
+            training_kwargs["loss_fn"] = CombinedLoss(station_cdist)
+        elif args.x_loss_function == "emdbalancedspatiotemporal":
+            # actually combined sinkhorn temporal
             training_kwargs["loss_fn"] = CombinedLoss(
+                spatiotemporal_cost, spatiotemporal=True
+            )
+        elif args.x_loss_function == "emdunbalancedspatial":
+            training_kwargs["loss_fn"] = SinkhornUnbalanced(station_cdist)
+        elif args.x_loss_function == "emdunbalancedspatiotemporal":
+            training_kwargs["loss_fn"] = SinkhornUnbalanced(
                 spatiotemporal_cost, spatiotemporal=True
             )
         else:
             raise NotImplementedError(
-                "Must be sinkhorn, sinkhorntemporal or combinedsinkhorn"
+                "Must be emdbalancedspatial, emdunbalancedspatial,\
+                     emdunbalancedspatiotemporalor emdbalancedspatiotemporal"
             )
     elif args.x_loss_function == "distribution":
         training_kwargs["loss_fn"] = DistributionMSE()
     elif args.x_loss_function == "crossentropy":
         training_kwargs["loss_fn"] = StepwiseCrossentropy()
+    elif args.x_loss_function != "basic":
+        raise NotImplementedError(
+            "Must be basic, an EMD loss function, distribution or crossentropy"
+        )
 
     # Run model comparison
     train_and_test(

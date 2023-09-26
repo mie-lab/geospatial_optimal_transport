@@ -2,11 +2,12 @@ import geomloss
 import torch
 import numpy as np
 from torch.nn import MSELoss
+import ot
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-class SinkhornLoss:
+class SinkhornBalanced:
     def __init__(self, C, normalize_c=True, blur=0.5, **sinkhorn_kwargs):
         if isinstance(C, np.ndarray):
             C = torch.from_numpy(C)
@@ -74,7 +75,7 @@ class SinkhornLoss:
         return torch.sum(loss)
 
 
-class SinkhornSpatiotemporal(SinkhornLoss):
+class SinkhornSpatiotemporal(SinkhornBalanced):
     def __call__(self, a_in, b_in):
         assert (
             a_in.dim() == 3
@@ -105,7 +106,7 @@ class CombinedLoss:
         if spatiotemporal:
             self.sinkhorn_error = SinkhornSpatiotemporal(C)
         else:
-            self.sinkhorn_error = SinkhornLoss(C)
+            self.sinkhorn_error = SinkhornBalanced(C)
         self.dist_weight = dist_weight
 
     def __call__(self, a_in, b_in):
@@ -116,7 +117,68 @@ class CombinedLoss:
         return (1 - self.dist_weight) * mse_loss + self.dist_weight * sink_loss
 
 
-def sinkhorn_loss_from_numpy(a, b, cost_matrix, sinkhorn_kwargs={}):
+class SinkhornUnbalanced:
+    def __init__(
+        self,
+        C,
+        spatiotemporal=False,
+        normalize_c=True,
+        reg=0.1,
+        reg_m=10,
+        max_iters=100,
+    ):
+        self.spatiotemporal = spatiotemporal
+        self.reg = reg
+        self.reg_m = reg_m
+        self.max_iters = max_iters
+        if isinstance(C, np.ndarray):
+            C = torch.from_numpy(C)
+        # normalize to values betwen 0 and 1
+        if normalize_c:
+            C = C / torch.sum(C)
+        self.cost_matrix = C.to(device)
+
+    def __call__(self, a, b):
+        if self.spatiotemporal:
+            # then reshape -> flatten space-time axes
+            a = a.reshape((a.size()[0], -1))
+            b = b.reshape((b.size()[0], -1))
+
+        # manually add up losses for the batch
+        loss = 0
+        for batch_sample in range(a.size()[0]):
+            if a.dim() > 2:
+                # not spatiotemporal loss, but instead average over time axis
+                for time_sample in range(a.size()[1]):
+                    loss += self.compute_emd_single(
+                        a[batch_sample, time_sample],
+                        b[batch_sample, time_sample],
+                    )
+            else:
+                loss += self.computed_emd_single(
+                    a[batch_sample], b[batch_sample]
+                )
+        return loss
+
+    def compute_emd_single(self, a, b):
+        emd_loss = ot.sinkhorn_unbalanced2(
+            a,
+            b,
+            self.cost_matrix,
+            self.reg,
+            self.reg_m,
+            method="sinkhorn",
+            numItermax=self.max_iters,
+            stopThr=1e-06,
+            verbose=False,
+            log=False,
+        )
+        return emd_loss
+
+
+def sinkhorn_loss_from_numpy(
+    a, b, cost_matrix, sinkhorn_kwargs={}, loss_class=SinkhornBalanced
+):
     a = torch.tensor(a.tolist()).float()
     b = torch.tensor(b.tolist()).float()
     # cost_matrix = torch.tensor([cost_matrix])
@@ -124,7 +186,7 @@ def sinkhorn_loss_from_numpy(a, b, cost_matrix, sinkhorn_kwargs={}):
     # a = a.unsqueeze(1).repeat(1, 3, 1)
     # b = b.unsqueeze(1).repeat(1, 3, 1)
     # print("Before initializing", cost_matrix.shape, a.size(), b.size())
-    loss = SinkhornLoss(cost_matrix, **sinkhorn_kwargs)
+    loss = loss_class(cost_matrix, **sinkhorn_kwargs)
     return loss(a, b)
 
 
@@ -142,5 +204,6 @@ if __name__ == "__main__":
             np.array([[1, 3, 2, 4], [1, 3, 2, 4]]),
             np.array([[1, 2, 3, 4], [1, 2, 3, 4]]),
             test_cdist,
+            loss_class=SinkhornUnbalanced,
         )
     )
