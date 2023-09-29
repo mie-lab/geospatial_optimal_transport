@@ -18,6 +18,7 @@ from geoemd.utils import (
 )
 from geoemd.loss.sinkhorn_loss import SinkhornUnbalanced, CombinedLoss
 from geoemd.loss.distribution_loss import StepwiseCrossentropy, DistributionMSE
+from geoemd.loss.unbalanced import UnbalancedSinkhorn
 from geoemd.config import (
     STEPS_AHEAD,
     TRAINTEST_SPLIT,
@@ -295,9 +296,10 @@ if __name__ == "__main__":
                 spatiotemporal_cost, spatiotemporal=True
             )
         elif args.x_loss_function == "emdunbalancedspatial":
-            training_kwargs["loss_fn"] = SinkhornUnbalanced(station_cdist)
+            training_kwargs["loss_fn"] = UnbalancedSinkhorn(station_cdist)
+            # training_kwargs["pl_trainer_kwargs"] = {"gradient_clip_val": 1}
         elif args.x_loss_function == "emdunbalancedspatiotemporal":
-            training_kwargs["loss_fn"] = SinkhornUnbalanced(
+            training_kwargs["loss_fn"] = UnbalancedSinkhorn(
                 spatiotemporal_cost, spatiotemporal=True
             )
         else:

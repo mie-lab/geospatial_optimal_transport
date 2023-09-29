@@ -117,7 +117,7 @@ class CombinedLoss:
         return (1 - self.dist_weight) * mse_loss + self.dist_weight * sink_loss
 
 
-class SinkhornUnbalanced:
+class DeprecatedSinkhornUnbalanced:
     def __init__(
         self,
         C,
@@ -143,26 +143,36 @@ class SinkhornUnbalanced:
             # then reshape -> flatten space-time axes
             a = a.reshape((a.size()[0], -1))
             b = b.reshape((b.size()[0], -1))
-
         # manually add up losses for the batch
-        loss = 0
-        for batch_sample in range(a.size()[0]):
+        batchsize = a.size()[0]
+        for batch_sample in range(batchsize):
             if a.dim() > 2:
+                # define empty array
+                steps_ahead = a.size()[1]
+                loss = torch.empty((batchsize, steps_ahead))
                 # not spatiotemporal loss, but instead average over time axis
-                for time_sample in range(a.size()[1]):
-                    loss += self.compute_emd_single(
+                for time_sample in range(steps_ahead):
+                    # with torch.autograd.detect_anomaly():
+                    #     loss = self.compute_emd_single(
+                    #         a[batch_sample, time_sample],
+                    #         b[batch_sample, time_sample],
+                    #     )
+                    #     loss.backward()
+                    loss[batch_sample, time_sample] = self.compute_emd_single(
                         a[batch_sample, time_sample],
                         b[batch_sample, time_sample],
                     )
             else:
-                loss += self.computed_emd_single(
+                loss = torch.empty(batchsize)
+                loss[batch_sample] = self.compute_emd_single(
                     a[batch_sample], b[batch_sample]
                 )
-        return loss
+        # print("MEAN", torch.mean(loss))
+        return torch.mean(loss)
 
     def compute_emd_single(self, a, b):
         emd_loss = ot.sinkhorn_unbalanced2(
-            a,
+            torch.clamp(a, min=0),
             b,
             self.cost_matrix,
             self.reg,
@@ -204,6 +214,6 @@ if __name__ == "__main__":
             np.array([[1, 3, 2, 4], [1, 3, 2, 4]]),
             np.array([[1, 2, 3, 4], [1, 2, 3, 4]]),
             test_cdist,
-            loss_class=SinkhornUnbalanced,
+            loss_class=DeprecatedSinkhornUnbalanced,
         )
     )
