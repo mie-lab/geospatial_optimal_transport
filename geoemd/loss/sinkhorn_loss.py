@@ -1,8 +1,6 @@
 import geomloss
 import torch
 import numpy as np
-from torch.nn import MSELoss
-import ot
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 NONZERO_FACTOR = 1e-5

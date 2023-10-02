@@ -31,7 +31,7 @@ from geoemd.config import (
 )
 import warnings
 
-DEBUG = True
+DEBUG = False
 warnings.filterwarnings("ignore")
 
 np.random.seed(42)
