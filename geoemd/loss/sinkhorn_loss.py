@@ -76,6 +76,7 @@ class SinkhornLoss:
         else:
             # TODO: Any other possibility to do relu without getting all zeros?
             a = torch.relu(a_in) + NONZERO_FACTOR
+            b = b_in
 
         # 2) flatten one axis -> either for spatiotemporal OT or treating the
         # temporal axis as batch
