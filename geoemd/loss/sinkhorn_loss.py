@@ -7,8 +7,18 @@ import ot
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-class SinkhornBalanced:
-    def __init__(self, C, normalize_c=True, blur=0.5, **sinkhorn_kwargs):
+class SinkhornLoss:
+    def __init__(
+        self,
+        C,
+        normalize_c=True,
+        blur=0.01,
+        reach=0.01,
+        mode="unbalanced",
+        **sinkhorn_kwargs
+    ):
+        assert mode in ["unbalanced", "balancedSoftmax", "balanced"]
+        self.mode = mode
         if isinstance(C, np.ndarray):
             C = torch.from_numpy(C)
         # normalize to values betwen 0 and 1
@@ -35,6 +45,7 @@ class SinkhornBalanced:
             backend="tensorized",
             debias=True,
             blur=blur,
+            reach=reach,
             **sinkhorn_kwargs,
         )
 
@@ -54,12 +65,17 @@ class SinkhornBalanced:
         batch_size = a_in.size()[0]
         self.adapt_to_batchsize(batch_size)
 
-        # this yields a spearman correlation of 0.74
-        a = (a_in * 2.71828).softmax(dim=-1)
-        # for spearman correlation of 0.95, use:
-        # a = a_in / torch.unsqueeze(torch.sum(a_in, dim=-1), a_in.dim() - 1)
-        # print(b_in.size(), torch.sum(b_in, dim=-1).size())
-        b = b_in / torch.unsqueeze(torch.sum(b_in, dim=-1), b_in.dim() - 1)
+        if self.mode == "balanced":
+            a = a_in / torch.unsqueeze(torch.sum(a_in, dim=-1), a_in.dim() - 1)
+            b = b_in / torch.unsqueeze(torch.sum(b_in, dim=-1), b_in.dim() - 1)
+        elif self.mode == "balancedSoftmax":
+            # this yields a spearman correlation of 0.74
+            a = (a_in * 2.71828).softmax(dim=-1)
+            b = b_in / torch.unsqueeze(torch.sum(b_in, dim=-1), b_in.dim() - 1)
+        else:
+            # Any other possibility to do relu wihtout getting all zeros?
+            a = torch.relu(a_in) + 1e-4
+            b = b_in
 
         # check if we predicted several steps ahead
         steps_ahead = a.size()[1]
@@ -72,10 +88,10 @@ class SinkhornBalanced:
             loss = torch.mean(result, dim=0)
         else:
             loss = self.loss_object(a, self.dummy_locs, b, self.dummy_locs)
-        return torch.sum(loss)
+        return torch.sum(loss) * 100
 
 
-class SinkhornSpatiotemporal(SinkhornBalanced):
+class SinkhornSpatiotemporal(SinkhornLoss):
     def __call__(self, a_in, b_in):
         assert (
             a_in.dim() == 3
@@ -86,27 +102,37 @@ class SinkhornSpatiotemporal(SinkhornBalanced):
         self.adapt_to_batchsize(batch_size)
 
         # normalize over station-axis first --> station predictions sum to 1
-        a = (a_in * 2.71828).softmax(dim=-1)
-        b = b_in / torch.unsqueeze(torch.sum(b_in, dim=-1), b_in.dim() - 1)
+        if self.mode == "balancedSoftmax":
+            a = (a_in * 2.71828).softmax(dim=-1)
+            b = b_in / torch.unsqueeze(torch.sum(b_in, dim=-1), b_in.dim() - 1)
+        elif self.mode == "balanced":
+            a = a_in / torch.unsqueeze(torch.sum(a_in, dim=-1), a_in.dim() - 1)
+            b = b_in / torch.unsqueeze(torch.sum(b_in, dim=-1), b_in.dim() - 1)
+        else:
+            a = a_in
+            b = b_in
         # then reshape -> flatten space-time axes
         a = a.reshape((a_in.size()[0], -1))
         b = b.reshape((b_in.size()[0], -1))
 
-        # normalize again such that it overall sums up to 1
-        a = a / torch.unsqueeze(torch.sum(a, dim=-1), a.dim() - 1)
-        b = b / torch.unsqueeze(torch.sum(b, dim=-1), b.dim() - 1)
+        if self.mode in ["balanced", "balancedSoftmax"]:
+            # normalize again such that it overall sums up to 1
+            a = a / torch.unsqueeze(torch.sum(a, dim=-1), a.dim() - 1)
+            b = b / torch.unsqueeze(torch.sum(b, dim=-1), b.dim() - 1)
 
         loss = self.loss_object(a, self.dummy_locs, b, self.dummy_locs)
         return torch.sum(loss)
 
 
 class CombinedLoss:
-    def __init__(self, C, dist_weight=0.9, spatiotemporal=False) -> None:
+    def __init__(
+        self, C, dist_weight=0.9, mode="balancedSoftmax", spatiotemporal=False
+    ) -> None:
         self.standard_mse = MSELoss()
         if spatiotemporal:
-            self.sinkhorn_error = SinkhornSpatiotemporal(C)
+            self.sinkhorn_error = SinkhornSpatiotemporal(C, mode=mode)
         else:
-            self.sinkhorn_error = SinkhornBalanced(C)
+            self.sinkhorn_error = SinkhornLoss(C, mode=mode)
         self.dist_weight = dist_weight
 
     def __call__(self, a_in, b_in):
@@ -117,77 +143,13 @@ class CombinedLoss:
         return (1 - self.dist_weight) * mse_loss + self.dist_weight * sink_loss
 
 
-class DeprecatedSinkhornUnbalanced:
-    def __init__(
-        self,
-        C,
-        spatiotemporal=False,
-        normalize_c=True,
-        reg=0.1,
-        reg_m=10,
-        max_iters=100,
-    ):
-        self.spatiotemporal = spatiotemporal
-        self.reg = reg
-        self.reg_m = reg_m
-        self.max_iters = max_iters
-        if isinstance(C, np.ndarray):
-            C = torch.from_numpy(C)
-        # normalize to values betwen 0 and 1
-        if normalize_c:
-            C = C / torch.sum(C)
-        self.cost_matrix = C.to(device)
-
-    def __call__(self, a, b):
-        if self.spatiotemporal:
-            # then reshape -> flatten space-time axes
-            a = a.reshape((a.size()[0], -1))
-            b = b.reshape((b.size()[0], -1))
-        # manually add up losses for the batch
-        batchsize = a.size()[0]
-        for batch_sample in range(batchsize):
-            if a.dim() > 2:
-                # define empty array
-                steps_ahead = a.size()[1]
-                loss = torch.empty((batchsize, steps_ahead))
-                # not spatiotemporal loss, but instead average over time axis
-                for time_sample in range(steps_ahead):
-                    # with torch.autograd.detect_anomaly():
-                    #     loss = self.compute_emd_single(
-                    #         a[batch_sample, time_sample],
-                    #         b[batch_sample, time_sample],
-                    #     )
-                    #     loss.backward()
-                    loss[batch_sample, time_sample] = self.compute_emd_single(
-                        a[batch_sample, time_sample],
-                        b[batch_sample, time_sample],
-                    )
-            else:
-                loss = torch.empty(batchsize)
-                loss[batch_sample] = self.compute_emd_single(
-                    a[batch_sample], b[batch_sample]
-                )
-        # print("MEAN", torch.mean(loss))
-        return torch.mean(loss)
-
-    def compute_emd_single(self, a, b):
-        emd_loss = ot.sinkhorn_unbalanced2(
-            torch.clamp(a, min=0),
-            b,
-            self.cost_matrix,
-            self.reg,
-            self.reg_m,
-            method="sinkhorn",
-            numItermax=self.max_iters,
-            stopThr=1e-06,
-            verbose=False,
-            log=False,
-        )
-        return emd_loss
-
-
 def sinkhorn_loss_from_numpy(
-    a, b, cost_matrix, sinkhorn_kwargs={}, loss_class=SinkhornBalanced
+    a,
+    b,
+    cost_matrix,
+    mode="unbalanced",
+    sinkhorn_kwargs={},
+    loss_class=SinkhornLoss,
 ):
     a = torch.tensor(a.tolist()).float()
     b = torch.tensor(b.tolist()).float()
@@ -196,7 +158,7 @@ def sinkhorn_loss_from_numpy(
     # a = a.unsqueeze(1).repeat(1, 3, 1)
     # b = b.unsqueeze(1).repeat(1, 3, 1)
     # print("Before initializing", cost_matrix.shape, a.size(), b.size())
-    loss = loss_class(cost_matrix, **sinkhorn_kwargs)
+    loss = loss_class(cost_matrix, mode=mode, **sinkhorn_kwargs)
     return loss(a, b)
 
 
@@ -214,6 +176,6 @@ if __name__ == "__main__":
             np.array([[1, 3, 2, 4], [1, 3, 2, 4]]),
             np.array([[1, 2, 3, 4], [1, 2, 3, 4]]),
             test_cdist,
-            loss_class=DeprecatedSinkhornUnbalanced,
+            loss_class=SinkhornLoss,
         )
     )

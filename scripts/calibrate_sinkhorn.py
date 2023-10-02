@@ -61,6 +61,7 @@ class EMDCalibrator(EMDWrapper):
                     np.expand_dims(pred_quantile_normed, 0),
                     np.expand_dims(gt_quantile_normed, 0),
                     self.dist_matrix,
+                    # mode="balancedSoftmax",
                 )
             )
 
