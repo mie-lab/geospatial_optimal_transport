@@ -25,7 +25,7 @@ class SinkhornLoss:
             C = torch.from_numpy(C)
         # normalize to values betwen 0 and 1
         if normalize_c:
-            C = C / torch.sum(C)
+            C = C / torch.max(C)
         if C.dim() != 3:
             if C.dim() != 2:
                 raise ValueError("cost matrix C must have 2 or 3 dimensions")
@@ -110,10 +110,10 @@ class CombinedLoss:
             self.sinkhorn_error = SinkhornLoss(
                 C, mode=mode, spatiotemporal=True
             )
-            self.dist_weight = 500
+            self.dist_weight = 50
         else:
             self.sinkhorn_error = SinkhornLoss(C, mode=mode)
-            self.dist_weight = 50
+            self.dist_weight = 5
 
     def __call__(self, a_in, b_in):
         # compute the error between the mean of predicted and mean of gt demand
