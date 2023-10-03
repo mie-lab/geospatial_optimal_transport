@@ -13,8 +13,9 @@ class SinkhornLoss:
         C,
         normalize_c=True,
         spatiotemporal=False,
-        blur=0.01,
+        blur=0.1,
         reach=0.01,
+        scaling=0.1,
         mode="unbalanced",
         **sinkhorn_kwargs
     ):
@@ -49,6 +50,7 @@ class SinkhornLoss:
             debias=True,
             blur=blur,
             reach=reach,
+            scaling=scaling,
             **sinkhorn_kwargs,
         )
 
@@ -103,6 +105,17 @@ class SinkhornLoss:
             b = b / torch.unsqueeze(torch.sum(b, dim=-1), -1)
 
         loss = self.loss_object(a, self.dummy_locs, b, self.dummy_locs)
+        # DEBUG:
+        # if torch.any(loss < 0):
+        #     import pickle
+        #     with open("test.pkl", "wb") as outfile:
+        #         pickle.dump((a, b, self.cost_matrix, self.dummy_locs), outfile)
+        #         exit()
+        # print(a.size(), torch.sum(a, dim=-1))
+        # print(b.size(), torch.sum(b, dim=-1))
+        # print(torch.any(a < 0))
+        # print(torch.any(self.cost_matrix < 0))
+
         return torch.sum(loss)
 
 
