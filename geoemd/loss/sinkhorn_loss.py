@@ -1,6 +1,7 @@
 import geomloss
 import torch
 import numpy as np
+from torch.nn import MSELoss
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 NONZERO_FACTOR = 1e-5
@@ -83,8 +84,8 @@ class SinkhornLoss:
         batch_size = a.size()[0]
         if self.spatiotemporal:
             # flatten space-time axes
-            a = a.reshape((a_in.size()[0], -1))
-            b = b.reshape((b_in.size()[0], -1))
+            a = a.reshape((batch_size, -1))
+            b = b.reshape((batch_size, -1))
         elif a.dim() == 3:
             # if we have to flatten at all, flatten time over the batch size
             steps_ahead = a.size()[1]
@@ -97,7 +98,7 @@ class SinkhornLoss:
 
         # 4) Normalize again if spatiotemporal (over the space-time axis)
         # such that it overall sums up to 1
-        if self.spatiotemporal:
+        if self.spatiotemporal and self.mode != "unbalanced":
             a = a / torch.unsqueeze(torch.sum(a, dim=-1), -1)
             b = b / torch.unsqueeze(torch.sum(b, dim=-1), -1)
 
@@ -107,21 +108,23 @@ class SinkhornLoss:
 
 class CombinedLoss:
     def __init__(self, C, mode="balancedSoftmax", spatiotemporal=False) -> None:
+        self.standard_mse = MSELoss()
         if spatiotemporal:
             self.sinkhorn_error = SinkhornLoss(
                 C, mode=mode, spatiotemporal=True
             )
-            self.dist_weight = 50
+            self.dist_weight = 100
         else:
             self.sinkhorn_error = SinkhornLoss(C, mode=mode)
-            self.dist_weight = 5
+            self.dist_weight = 10
 
     def __call__(self, a_in, b_in):
         # compute the error between the mean of predicted and mean of gt demand
         # this is the overall demand per timestep per batch
-        total_mse = (torch.mean(a_in, dim=-1) - torch.mean(b_in, dim=-1)) ** 2
+        # total_mse = (torch.mean(a_in, dim=-1) - torch.mean(b_in, dim=-1)) ** 2
         # take the average of the demand divergence over batch & timestep
-        mse_loss = torch.mean(total_mse)
+        # mse_loss = torch.mean(total_mse)
+        mse_loss = self.standard_mse(a_in, b_in)
         # mse_loss = self.standard_mse(a_in, b_in)
         sink_loss = self.sinkhorn_error(a_in, b_in)
         # for checking calibration of weighting

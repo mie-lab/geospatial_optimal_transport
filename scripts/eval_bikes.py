@@ -68,6 +68,7 @@ def compare_emd(
 
         # compute basic MAE errors
         res["error"] = (res["gt"] - res["pred"]).abs()
+        res["mse_error"] = (res["gt"] - res["pred"]) ** 2
 
         # retrieve clustering method and groups from the file name
         clustering_method = [f[:-4].split("_")[-1]]
@@ -116,6 +117,7 @@ def compare_emd(
                     "EMD_std": np.std(emd),
                     "MAE": res["error"].mean(),
                     "MAE std": res["error"].std(),
+                    "MSE": res["mse_error"].mean(),
                     "station-wise MAE": res["station_wise_error"].mean(),
                     "station-wise MAE std": res["station_wise_error"].std(),
                 }
