@@ -14,19 +14,29 @@ from darts.utils.timeseries_generation import (
 )
 from darts.dataprocessing.transformers import Scaler
 from geoemd.baseline_models import LastStepModel
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+
+# a period of 5 epochs (`patience`)
+early_stopper = EarlyStopping(
+    monitor="val_loss",
+    patience=3,
+    min_delta=0.00,
+    mode="min",
+)
 
 
 class CovariateWrapper:
     def __init__(
         self,
         time_series,
+        val_cutoff,
         train_cutoff,
         lags_past_covariates=0,
         dt_covariates=True,
     ) -> None:
         self.lags_past_covariates = lags_past_covariates
         self.train_cutoff = train_cutoff
-
+        self.val_cutoff = val_cutoff
         # if 0, don't return any covariates
         if self.lags_past_covariates == 0:
             return None
@@ -38,9 +48,15 @@ class CovariateWrapper:
         if self.lags_past_covariates == 0:
             return None
         else:
-            return self.covariates[: self.train_cutoff]
+            return self.covariates[: self.val_cutoff]
 
-    def get_val_covariates(self, val_index, steps_ahead):
+    def get_val_covariates(self):
+        if self.lags_past_covariates == 0:
+            return None
+        else:
+            return self.covariates[self.val_cutoff : self.train_cutoff]
+
+    def get_test_covariates(self, val_index, steps_ahead):
         if self.lags_past_covariates == 0:
             return None
         else:
@@ -99,6 +115,7 @@ class ModelWrapper:
                 "torch_metrics": torchmetrics.MetricCollection(
                     torchmetrics.MeanSquaredError(), torch.nn.CrossEntropyLoss()
                 ),
+                "pl_trainer_kwargs": {"callbacks": [early_stopper]},
             }
             if kwargs["x_scale"]:
                 encoders["transformer"] = Scaler()
@@ -149,9 +166,16 @@ class ModelWrapper:
 
         self.covariate_wrapper = covariate_wrapper
 
-    def fit(self, series):
+    def fit(self, series, val_series=None):
         if self.model_class == "exponential":
             self.model.fit(series)
+        elif self.model_class == "nhits":
+            self.model.fit(
+                series,
+                val_series=val_series,
+                past_covariates=self.covariate_wrapper.get_train_covariates(),
+                val_past_covariates=self.covariate_wrapper.get_val_covariates(),
+            )
         else:
             self.model.fit(
                 series,
@@ -165,7 +189,7 @@ class ModelWrapper:
         pred = self.model.predict(
             n=n,
             series=series,
-            past_covariates=self.covariate_wrapper.get_val_covariates(
+            past_covariates=self.covariate_wrapper.get_test_covariates(
                 val_index, n
             ),
         )

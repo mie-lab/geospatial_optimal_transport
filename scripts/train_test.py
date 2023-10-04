@@ -24,6 +24,7 @@ from geoemd.loss.distribution_loss import StepwiseCrossentropy, DistributionMSE
 from geoemd.config import (
     STEPS_AHEAD,
     TRAINTEST_SPLIT,
+    TRAINVAL_SPLIT,
     TEST_SAMPLES,
     MAX_COUNT,
     SPEED_FACTOR,
@@ -97,8 +98,10 @@ def train_and_test(
     shared_demand_series = shared_demand_series / norm_factor
 
     # split train and val
-    train_cutoff = int(TRAINTEST_SPLIT * len(shared_demand_series))
-    train = shared_demand_series[:train_cutoff]
+    val_cutoff = int(TRAINVAL_SPLIT * len(shared_demand_series))  # 0.8
+    train_cutoff = int(TRAINTEST_SPLIT * len(shared_demand_series))  # 0.9
+    train = shared_demand_series[:val_cutoff]
+    val = shared_demand_series[val_cutoff:train_cutoff]
 
     # select TEST_SAMPLES random time points during val time
     assert TEST_SAMPLES < len(shared_demand_series) - train_cutoff - STEPS_AHEAD
@@ -134,6 +137,7 @@ def train_and_test(
     )
     covariate_wrapper = CovariateWrapper(
         shared_demand_series,
+        val_cutoff,
         train_cutoff,
         lags_past_covariates=cov_lag,
         dt_covariates=True,
@@ -146,7 +150,7 @@ def train_and_test(
     # fit model
     if multi_vs_ind == "multi":
         regr = ModelWrapper(model, covariate_wrapper, **kwargs)
-        regr.fit(train)
+        regr.fit(train, val_series=val)
     else:  # independent forecast
         fitted_models = []
         for component in shared_demand_series.components:
