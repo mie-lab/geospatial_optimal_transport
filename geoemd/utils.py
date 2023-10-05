@@ -48,6 +48,7 @@ def argument_parsing():
     parser.add_argument("--model_path", type=str, default="trained_models")
     parser.add_argument("--load_model_name", type=str, default=None)
     parser.add_argument("--ordered_samples", action="store_true")
+    parser.add_argument("--optimize_optuna", action="store_true")
     args = parser.parse_args()
     if args.reconcile > 0:
         assert args.hierarchy != 0
@@ -69,6 +70,7 @@ def construct_name(args):
         "load_model_name",
         "model_path",
         "ordered_samples",
+        "optimize_optuna",
         "config",
     ]:
         arg_dict_wo_path.pop(path_arg)

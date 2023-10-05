@@ -20,6 +20,7 @@ from geoemd.loss.sinkhorn_loss import (
     CombinedLoss,
     SinkhornLoss,
 )
+from geoemd.parameter_optimization import OptunaOptimizer
 from geoemd.loss.distribution_loss import StepwiseCrossentropy, DistributionMSE
 from geoemd.config import (
     STEPS_AHEAD,
@@ -92,6 +93,7 @@ def train_and_test(
     norm_factor=10,
     reconcile=0,
     ordered_test_samples=False,
+    optimize_optuna=False,
     **kwargs,
 ):
     # normalize whole time series
@@ -119,6 +121,11 @@ def train_and_test(
             TEST_SAMPLES,
             replace=False,
         )
+
+    if optimize_optuna:
+        param_optim = OptunaOptimizer(**kwargs)
+        param_optim(train, val)
+        return 0
 
     # Add gt
     gt_res_dfs = []
@@ -159,7 +166,7 @@ def train_and_test(
             fitted_models.append(regr)
 
     if DEBUG:
-        exit()
+        return 0
 
     # predict
     model_res_dfs = []
