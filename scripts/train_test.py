@@ -15,6 +15,7 @@ from geoemd.utils import (
     construct_name,
     get_dataset_name,
     spacetime_cost_matrix,
+    space_cost_matrix,
 )
 from geoemd.loss.sinkhorn_loss import (
     CombinedLoss,
@@ -293,17 +294,17 @@ if __name__ == "__main__":
             station_coords = stations_locations.loc[
                 demand_agg.columns, ["x", "y"]
             ].values
-        station_cdist = cdist(station_coords, station_coords)
-        station_cdist = station_cdist / np.max(station_cdist)
+        # pairwise distance between stations (in terms of travel time)
+        time_dist_matrix = space_cost_matrix(station_coords)
+        # TODO: , speed_factor=SPEED_FACTOR[dataset], quadratic=False
         if "temporal" in args.x_loss_function:
             spatiotemporal_cost = spacetime_cost_matrix(
-                station_cdist,
+                time_dist_matrix,
                 time_steps=STEPS_AHEAD,
-                speed_factor=SPEED_FACTOR[dataset],
             )
         if args.x_loss_function == "emdbalancedspatial":
             training_kwargs["loss_fn"] = CombinedLoss(
-                station_cdist, mode="balancedSoftmax"
+                time_dist_matrix, mode="balancedSoftmax"
             )
         elif args.x_loss_function == "emdbalancedspatiotemporal":
             # actually combined sinkhorn temporal
@@ -312,7 +313,7 @@ if __name__ == "__main__":
             )
         elif args.x_loss_function == "emdunbalancedspatial":
             training_kwargs["loss_fn"] = SinkhornLoss(
-                station_cdist, mode="unbalanced", spatiotemporal=False
+                time_dist_matrix, mode="unbalanced", spatiotemporal=False
             )
             # training_kwargs["pl_trainer_kwargs"] = {"gradient_clip_val": 1}
         elif args.x_loss_function == "emdunbalancedspatiotemporal":

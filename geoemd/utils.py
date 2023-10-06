@@ -1,7 +1,8 @@
 import numpy as np
 import argparse
 import collections
-from geoemd.config import CONFIG
+from geoemd.config import CONFIG, QUADRATIC_TIME
+from scipy.spatial.distance import cdist
 
 
 def argument_parsing():
@@ -148,24 +149,46 @@ def get_dataset_name(in_path_data):
         raise ValueError("In path wrong, does not match available dataset")
 
 
+def space_cost_matrix(
+    coords1,
+    coords2=None,
+    speed_factor=None,
+    quadratic=False,
+    quadratic_factor=QUADRATIC_TIME,
+):
+    """
+    speed_factor: relocation speed of users (in km/h)
+    """
+    if coords2 is None:
+        coords2 = coords1
+    dist_matrix = cdist(coords1, coords2)
+
+    # convert space to time (in h)
+    if speed_factor is not None:
+        time_matrix = dist_matrix / speed_factor
+    else:
+        time_matrix = dist_matrix
+
+    # convert to perceived time
+    if quadratic:
+        time_matrix = (time_matrix / quadratic_factor) ** 2
+    return time_matrix
+
+
 def spacetime_cost_matrix(
-    dist_matrix,
+    time_matrix,
     time_steps=3,
-    speed_factor=10,
     forward_cost=0,
     backward_cost=1,
 ):
     """
     Design a space-time cost matrix that quantifies the cost across space and time
     dist_matrix: pairwise distances in m
-    speed_factor: relocation speed of users (in km/h)
     forward_cost: cost for using demand that was originally allocated for the
     preceding timestep (usually low) - in hours
     backward_cost: cost for using demand that was allocated for the next timestep - in hours
     """
-    nr_stations = len(dist_matrix)
-
-    time_matrix = dist_matrix / speed_factor
+    nr_stations = len(time_matrix)
 
     final_cost_matrix = np.zeros(
         (time_steps * nr_stations, time_steps * nr_stations)

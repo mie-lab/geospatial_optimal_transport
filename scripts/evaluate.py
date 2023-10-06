@@ -5,7 +5,9 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+import warnings
 
+warnings.filterwarnings("ignore")
 plt.rcParams.update({"font.size": 20})
 
 from geoemd.emd_eval import EMDWrapper
@@ -103,7 +105,7 @@ def compare_emd(
 
         # compute EMD
         emd_compute = EMDWrapper(stations, gt_reference)
-        emd = emd_compute(res, res_hierarchy, mode=emd_mode)["EMD"].values
+        emd_out = emd_compute(res, res_hierarchy, mode=emd_mode)
 
         # trick to add the result two times if the clustering method is None
         for cluster_method in clustering_method:
@@ -113,8 +115,10 @@ def compare_emd(
                     "nr_group": nr_groups,
                     "clustering": cluster_method,
                     "loss": loss_fn,
-                    "EMD": np.mean(emd),
-                    "EMD_std": np.std(emd),
+                    "EMD": np.mean(emd_out["Wasserstein"].values),
+                    "EMD_std": np.std(emd_out["Wasserstein"].values),
+                    "OT unbalanced": np.mean(emd_out["OT unbalanced"].values),
+                    "Sinkhorn": np.mean(emd_out["sinkhorn"].values),
                     "MAE": res["error"].mean(),
                     "MAE std": res["error"].std(),
                     "MSE": res["mse_error"].mean(),
@@ -206,7 +210,7 @@ def correlate_mae_emd(single_station_res, out_path):
         right_on=["val_sample_ind", "steps_ahead"],
     )
     plt.figure(figsize=(6, 4))
-    plt.scatter(together["MAE"], together["EMD"])
+    plt.scatter(together["MAE"], together["Wasserstein"])
     plt.ylabel("EMD")
     plt.xlabel("MAE")
     plt.tight_layout()

@@ -1,9 +1,11 @@
 TRAINTEST_SPLIT = 0.9
-TEST_SAMPLES = 50  # number of time points where we start a prediction
+TEST_SAMPLES = 100  # number of time points where we start a prediction
 STEPS_AHEAD = 3
 MAX_COUNT = 1000  # how many rentals we expect maximally
 TRAINVAL_SPLIT = 0.8
 
+QUADRATIC_TIME = 0.1  # at 0.1h, so at 6min, the perceived time is higher than
+# the actual time (quadratic function at (1,1))
 CONFIG = {
     "bikes": {
         "model": "nhits",
