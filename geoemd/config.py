@@ -1,6 +1,6 @@
 TRAINTEST_SPLIT = 0.9
 TEST_SAMPLES = 100  # number of time points where we start a prediction
-STEPS_AHEAD = 3
+STEPS_AHEAD = 10
 MAX_COUNT = 1000  # how many rentals we expect maximally
 TRAINVAL_SPLIT = 0.8
 
