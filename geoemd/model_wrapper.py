@@ -8,6 +8,7 @@ from darts.models import (
     ExponentialSmoothing,
     LightGBMModel,
     NBEATSModel,
+    CatBoostModel,
 )
 from darts.utils.timeseries_generation import (
     datetime_attribute_timeseries as dt_attr,
@@ -120,7 +121,9 @@ class ModelWrapper:
             if kwargs["x_scale"]:
                 encoders["transformer"] = Scaler()
                 model_kwargs["add_encoders"] = encoders
-
+        elif model_class == "catboost":
+            ModelClass = CatBoostModel
+            model_kwargs = {"lags": self.model_args["lags"]}
         elif model_class == "lightgbm":
             ModelClass = LightGBMModel
             model_kwargs = {
@@ -143,10 +146,9 @@ class ModelWrapper:
             model_kwargs["lags_past_covariates"] = self.model_args[
                 "lags_past_covariates"
             ]
-        if model_class not in ["exponential"]:
-            model_kwargs["output_chunk_length"] = self.model_args[
-                "output_chunk_length"
-            ]
+        model_kwargs["output_chunk_length"] = self.model_args[
+            "output_chunk_length"
+        ]
 
         # add loss function
         if "loss_fn" in self.model_args:
@@ -167,9 +169,7 @@ class ModelWrapper:
         self.covariate_wrapper = covariate_wrapper
 
     def fit(self, series, val_series=None):
-        if self.model_class == "exponential":
-            self.model.fit(series)
-        elif self.model_class == "nhits":
+        if self.model_class == "nhits":
             self.model.fit(
                 series,
                 val_series=val_series,
@@ -183,9 +183,6 @@ class ModelWrapper:
             )
 
     def predict(self, n, series, val_index):
-        if self.model_class == "exponential":
-            pred = self.model.predict(n=n, series=series)
-            return pred
         pred = self.model.predict(
             n=n,
             series=series,
