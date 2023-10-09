@@ -32,12 +32,12 @@ def argument_parsing():
         type=str,
         help="One of 'bikes', 'charging', 'carsharing'",
     )
-    parser.add_argument("-m", "--model", default="linear", type=str)
+    parser.add_argument("-m", "--model", default="lightgbm", type=str)
     parser.add_argument("--multi_vs_ind", default="multi", type=str)
     parser.add_argument("-r", "--reconcile", default=0, type=int)
     parser.add_argument("-x", "--hierarchy", default=0, type=int)
     parser.add_argument("-l", "--lags", default=24, type=int)
-    parser.add_argument("--output_chunk_length", default=3, type=int)
+    parser.add_argument("--output_chunk_length", default=10, type=int)
     parser.add_argument("--n_epochs", default=70, type=int)
     parser.add_argument("--x_loss_function", default="basic", type=str)
     parser.add_argument("--x_scale", default=1, type=int)
