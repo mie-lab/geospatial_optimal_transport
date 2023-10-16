@@ -40,8 +40,8 @@ from geoemd.emd_eval import EMDWrapper
 
 
 class EMDCalibrator(EMDWrapper):
-    def compute_emd(self, res_per_station, norm_factor=8):
-        torch_res, emd_res = [], []
+    def compute_emd(self, res_per_station, scale_factor=8):
+        torch_res, emd_res, mae_res = [], [], []
         for (val_sample, steps_ahead), sample_df in res_per_station.groupby(
             ["val_sample_ind", "steps_ahead"]
         ):
@@ -52,17 +52,22 @@ class EMDCalibrator(EMDWrapper):
             )
 
             # normalize the values as they are normalized in the main training
-            pred_quantile_normed = sample_df["pred_emd"].values / norm_factor
-            gt_quantile_normed = gt_df["gt"].values / norm_factor
+            pred_quantile_scaled = sample_df["pred_emd"].values / scale_factor
+            gt_quantile_scaled = gt_df["gt"].values / scale_factor
 
             # compute sinkhorn loss
             torch_res.append(
                 sinkhorn_loss_from_numpy(
-                    np.expand_dims(pred_quantile_normed, 0),
-                    np.expand_dims(gt_quantile_normed, 0),
+                    np.expand_dims(pred_quantile_scaled, 0),
+                    np.expand_dims(gt_quantile_scaled, 0),
                     self.dist_matrix,
                     mode="balancedSoftmax",
                 )
+            )
+
+            # compute MAE
+            mae_res.append(
+                np.mean(np.abs(pred_quantile_scaled - gt_quantile_scaled))
             )
 
             # normal normalization is necessary for normal evaluation
@@ -78,6 +83,7 @@ class EMDCalibrator(EMDWrapper):
                 )
             )
         print("Spearman", round(spearmanr(torch_res, emd_res)[0], 4))
+        print("Spearman with MAE", round(spearmanr(emd_res, mae_res)[0], 4))
         return torch_res, emd_res
 
 
