@@ -145,8 +145,8 @@ class EMDWrapper:
             )
             # compute unbalanced OT with POT package
             unbalanced_ot = ot.sinkhorn_unbalanced2(
-                pred_vals.values,
-                gt_vals.values,
+                sample_df["pred_emd"].values,
+                sample_df["gt"].values,
                 normed_dist_matrix,
                 0.01,
                 10,
