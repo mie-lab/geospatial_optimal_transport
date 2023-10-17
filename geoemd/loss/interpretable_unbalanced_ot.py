@@ -28,14 +28,14 @@ class InterpretableUnbalancedOT:
         extended_cost_matrix[:clen, :clen] = cost_matrix
         extended_cost_matrix[clen, :] = penalty_unb
         extended_cost_matrix[:, clen] = penalty_unb
-        if normalize_c:
-            extended_cost_matrix = extended_cost_matrix / np.max(
-                extended_cost_matrix
-            )
         if compute_exact:
             self.cost_matrix = extended_cost_matrix
             self.balancedOT = wasserstein.EMD()
         else:
+            if normalize_c:
+                extended_cost_matrix = extended_cost_matrix / np.max(
+                    extended_cost_matrix
+                )
             # TODO: mode is balanced --> should be balancedSoftmax for backprop
             self.balancedOT = SinkhornLoss(
                 extended_cost_matrix,
@@ -68,6 +68,9 @@ class InterpretableUnbalancedOT:
             if self.norm_sum_1:
                 a_np = a_np / np.sum(a_np)
                 b_np = b_np / np.sum(b_np)
+            else:
+                # still need this code to avoid numeric errors
+                a_np = a_np / np.sum(a_np) * np.sum(b_np)
             cost = self.balancedOT(a_np, b_np, self.cost_matrix)
             return cost
         else:
