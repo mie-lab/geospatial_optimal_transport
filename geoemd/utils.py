@@ -1,9 +1,10 @@
 import numpy as np
 import argparse
 import collections
-from geoemd.config import CONFIG, QUADRATIC_TIME
 from scipy.spatial.distance import cdist
+import wasserstein
 
+from geoemd.config import CONFIG, QUADRATIC_TIME
 
 def argument_parsing():
     parser = argparse.ArgumentParser()
@@ -157,6 +158,7 @@ def space_cost_matrix(
     quadratic_factor=QUADRATIC_TIME,
 ):
     """
+    coords: spatial coordinates (projected, distances in m)
     speed_factor: relocation speed of users (in km/h)
     """
     if coords2 is None:
@@ -165,7 +167,7 @@ def space_cost_matrix(
 
     # convert space to time (in h)
     if speed_factor is not None:
-        time_matrix = dist_matrix / speed_factor
+        time_matrix = (dist_matrix / 1000) / speed_factor
     else:
         time_matrix = dist_matrix
 
@@ -208,3 +210,16 @@ def spacetime_cost_matrix(
                     time_matrix, waiting_time * np.ones(time_matrix.shape)
                 )
     return final_cost_matrix
+
+def balanced_ot_with_unbalanced_data(pred_vals, real_vals, dist_matrix):
+    dist_matrix_normed = dist_matrix / np.max(dist_matrix)
+
+    pred_vals_normed = pred_vals / np.sum(pred_vals) * np.sum(real_vals)
+    was = wasserstein.EMD()
+    emd1 = was(pred_vals_normed, real_vals, dist_matrix_normed)
+
+    # other way round
+    real_vals_normed = real_vals / np.sum(real_vals) * np.sum(pred_vals)
+    was = wasserstein.EMD()
+    emd2 = was(pred_vals, real_vals_normed, dist_matrix_normed)
+    return emd1, emd2

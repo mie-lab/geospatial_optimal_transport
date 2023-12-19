@@ -6,8 +6,10 @@ from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 import wasserstein
 from scipy.special import softmax
+import torch
 
 from geoemd.loss.sinkhorn_loss import sinkhorn_loss_from_numpy
+from geoemd.loss.moransi import MoransiLoss
 from geoemd.emd_eval import EMDWrapper
 
 # backup loss versions of sinkhorn loss:
@@ -41,6 +43,8 @@ from geoemd.emd_eval import EMDWrapper
 
 class EMDCalibrator(EMDWrapper):
     def compute_emd(self, res_per_station, scale_factor=8):
+        # # for testing moran's I
+        # morans_obj = MoransiLoss(self.dist_matrix)
         torch_res, emd_res, mae_res = [], [], []
         for (val_sample, steps_ahead), sample_df in res_per_station.groupby(
             ["val_sample_ind", "steps_ahead"]
@@ -82,6 +86,13 @@ class EMDCalibrator(EMDWrapper):
                     self.dist_matrix,
                 )
             )
+            # # For testing Moran's I
+            # torch_res.append(
+            #     morans_obj(
+            #         torch.from_numpy(np.expand_dims(pred_vals.values, 0)),
+            #         torch.from_numpy(np.expand_dims(gt_vals.values, 0)),
+            #     )
+            # )
         print("Spearman", round(spearmanr(torch_res, emd_res)[0], 4))
         print("Spearman with MAE", round(spearmanr(emd_res, mae_res)[0], 4))
         return torch_res, emd_res
@@ -196,9 +207,11 @@ if __name__ == "__main__":
         single_station_res["steps_ahead"] == 0
     ]
 
-    calib = EMDCalibrator(stations, single_station_res.drop("pred", axis=1))
-    torch_res, emd_res = calib(
-        single_station_res, None, mode="station_to_station"
+    calib = EMDCalibrator(
+        stations,
+        single_station_res.drop("pred", axis=1),
+        mode="station_to_station"
     )
+    torch_res, emd_res = calib(single_station_res)
     plt.scatter(emd_res, torch_res)
     plt.show()
