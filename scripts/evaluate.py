@@ -33,7 +33,11 @@ def load_stations(dataset):
 
 
 def compare_emd(
-    path, filter_step=-1, emd_mode="station_to_station", split_by_fraction=True
+    path,
+    filter_step=-1,
+    emd_mode="station_to_station",
+    split_by_fraction=True,
+    out_path=None,
 ):
     gt_reference = get_singlestations_file(path).drop("pred", axis=1)
     # load stations
@@ -70,7 +74,6 @@ def compare_emd(
 
         # compute basic MAE errors
         res["error"] = (res["gt"] - res["pred"]).abs()
-        res["mse_error"] = (res["gt"] - res["pred"]) ** 2
 
         # retrieve clustering method and groups from the file name
         clustering_method = [f[:-4].split("_")[-1]]
@@ -108,26 +111,26 @@ def compare_emd(
             stations, gt_reference, res_hierarchy, mode=emd_mode
         )
         emd_out = emd_compute(res)
+        if out_path is not None:
+            emd_out.to_csv(os.path.join(out_path, "res_" + f), index=False)
 
         # trick to add the result two times if the clustering method is None
         for cluster_method in clustering_method:
-            emd_results.append(
+            base_dict = (
+                emd_out.drop(["val_sample_ind", "steps_ahead"], axis=1)
+                .mean()
+                .to_dict()
+            )
+            base_dict.update(
                 {
                     "name": f[:-4],
                     "nr_group": nr_groups,
                     "clustering": cluster_method,
                     "loss": loss_fn,
-                    "EMD": np.mean(emd_out["Wasserstein"].values),
-                    "OT unbalanced": np.mean(emd_out["OT unbalanced"].values),
-                    "Sinkhorn": np.mean(emd_out["sinkhorn"].values),
-                    "MAE": res["error"].mean(),
-                    "MSE": res["mse_error"].mean(),
                     "station-wise MAE": res["station_wise_error"].mean(),
-                    "MAE std": res["error"].std(),
-                    "station-wise MAE std": res["station_wise_error"].std(),
-                    "EMD_std": np.std(emd_out["Wasserstein"].values),
                 }
             )
+            emd_results.append(base_dict)
         print(emd_results[-1])
     emd_results = pd.DataFrame(emd_results)
     return emd_results
@@ -217,7 +220,7 @@ def correlate_mae_emd(single_station_res, out_path, mode="station_to_station"):
         right_on=["val_sample_ind", "steps_ahead"],
     )
     plt.figure(figsize=(6, 4))
-    plt.scatter(together["MAE"], together["Wasserstein"])
+    plt.scatter(together["MAE"], together["EMD"])
     plt.ylabel("EMD")
     plt.xlabel("MAE")
     plt.tight_layout()
@@ -259,7 +262,10 @@ if __name__ == "__main__":
     # compute normal results
     if args.redo or not os.path.exists(out_path):
         emd_results = compare_emd(
-            comp_path, filter_step=args.steps_ahead, emd_mode=args.mode
+            comp_path,
+            filter_step=args.steps_ahead,
+            emd_mode=args.mode,
+            out_path=out_path,
         )
         emd_results.to_csv(os.path.join(out_path, f"results.csv"), index=False)
     else:

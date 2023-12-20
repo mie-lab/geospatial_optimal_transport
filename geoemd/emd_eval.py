@@ -1,4 +1,5 @@
 import wasserstein
+import time
 import pandas as pd
 import numpy as np
 from scipy.spatial.distance import cdist
@@ -47,7 +48,7 @@ class EMDWrapper:
         else:
             coords_per_group = self.get_coords_per_group(res_hierarchy)
 
-        # make dist matrix
+        # make dist matrix --> TODO: load it directly for traffic data
         if self.mode == "station_to_station":
             self.dist_matrix = space_cost_matrix(
                 self.stations[["x", "y"]], quadratic=quadratic_cost
@@ -133,24 +134,37 @@ class EMDWrapper:
         return self.compute_emd(res)
 
     def compute_emd(self, res_per_station: pd.DataFrame) -> list:
-        # compute emd
+        # compute entropy-regularized unbalanced OT (loss function)
         sinkhorn = SinkhornLoss(
-            self.dist_matrix, blur=0.1, reach=0.01, scaling=0.1, mode="balanced"
+            self.dist_matrix,
+            blur=0.1,
+            reach=0.01,
+            scaling=0.1,
+            mode="unbalanced",
         )
+        # Wasserstein distance -> also computed with normalized costs
         was = wasserstein.EMD()
-        unb_001 = InterpretableUnbalancedOT(
-            self.dist_matrix, compute_exact=True, penalty_unb=0.01
+        dist_matrix_normed = self.dist_matrix / np.max(self.dist_matrix)
+
+        # Unbalanced OT is computed with 0.1 quantile and with max cost
+        unb_ot_01quantile = InterpretableUnbalancedOT(
+            self.dist_matrix,
+            compute_exact=True,
+            normalize_c=True,
+            penalty_unb=np.quantile(self.dist_matrix, 0.1),
         )
-        # unb_01 = InterpretableUnbalancedOT(
-        #     self.dist_matrix, compute_exact=True, penalty_unb=0.1
-        # )
-        # unb_1 = InterpretableUnbalancedOT(
-        #     self.dist_matrix, compute_exact=True, penalty_unb=1
-        # )
+        unb_ot_max = InterpretableUnbalancedOT(
+            self.dist_matrix,
+            compute_exact=True,
+            normalize_c=True,
+            penalty_unb=np.max(self.dist_matrix),
+        )
+
         emd = []
         for (val_sample, steps_ahead), sample_df in res_per_station.groupby(
             ["val_sample_ind", "steps_ahead"]
         ):
+            # get values for this sample and this step ahead
             sample_df = sample_df.sort_values("station")
             pred_vals = sample_df["pred_emd"].values
             # get corresponding ground truth df
@@ -161,25 +175,38 @@ class EMDWrapper:
             # normalize pred by aligning to gt vals
             pred_vals_normed = pred_vals / np.sum(pred_vals) * np.sum(gt_vals)
 
-            # compute wasserstein (wo entropy, not normalized)
+            # compute base error metrics
+            mae = (sample_df["pred"] - sample_df["gt"]).abs()
+            mse = mae**2
+
+            # 1) compute wasserstein (wo entropy regularization, normalized C
             emd_distance = was(
                 pred_vals_normed,
                 gt_vals,
-                self.dist_matrix,
+                dist_matrix_normed,
             )
 
-            # compute sinkhorn loss with geomloss package
-            gt_tensor = torch.tensor([gt_vals.tolist()])
-            pred_tensor = torch.tensor([pred_vals.tolist()])
+            # 2) compute total error
+            total_error = np.abs(np.sum(gt_vals) - np.sum(pred_vals))
 
+            # 3) compute sinkhorn loss with geomloss package
+            gt_tensor = torch.from_numpy(gt_vals).unsqueeze(0)
+            pred_tensor = torch.from_numpy(pred_vals).unsqueeze(0)
             sinkhorn_loss = sinkhorn(pred_tensor, gt_tensor)
+
+            # 4) unbalanced ot
+            unb_ot_01quantile_res = unb_ot_01quantile(pred_tensor, gt_tensor)
+            unb_ot_max_res = unb_ot_max(pred_tensor, gt_tensor)
+
             emd.append(
                 {
-                    "Wasserstein": emd_distance,
-                    "OT unbalanced": unb_001(pred_tensor, gt_tensor),
-                    # "OT unbalanced (0.1)": unb_01(pred_tensor, gt_tensor),
-                    # "OT unbalanced (1)": unb_1(pred_tensor, gt_tensor),
-                    "sinkhorn": sinkhorn_loss.item() * 1000,
+                    "EMD": emd_distance,
+                    "Unb_OT_01quantile": unb_ot_01quantile_res,
+                    "Unb_OT_max": unb_ot_max_res,
+                    "total_error": total_error,
+                    "MAE": np.mean(mae),
+                    "MSE": np.mean(mse),
+                    "Sinkhorn": sinkhorn_loss.item() * 10,
                     "val_sample_ind": val_sample,
                     "steps_ahead": steps_ahead,
                 }
