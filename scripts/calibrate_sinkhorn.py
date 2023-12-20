@@ -6,8 +6,10 @@ from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 import wasserstein
 from scipy.special import softmax
+import torch
 
 from geoemd.loss.sinkhorn_loss import sinkhorn_loss_from_numpy
+from geoemd.loss.moransi import MoransiLoss
 from geoemd.emd_eval import EMDWrapper
 
 # backup loss versions of sinkhorn loss:
@@ -40,8 +42,10 @@ from geoemd.emd_eval import EMDWrapper
 
 
 class EMDCalibrator(EMDWrapper):
-    def compute_emd(self, res_per_station, norm_factor=8):
-        torch_res, emd_res = [], []
+    def compute_emd(self, res_per_station, scale_factor=8):
+        # # for testing moran's I
+        # morans_obj = MoransiLoss(self.dist_matrix)
+        torch_res, emd_res, mae_res = [], [], []
         for (val_sample, steps_ahead), sample_df in res_per_station.groupby(
             ["val_sample_ind", "steps_ahead"]
         ):
@@ -52,17 +56,22 @@ class EMDCalibrator(EMDWrapper):
             )
 
             # normalize the values as they are normalized in the main training
-            pred_quantile_normed = sample_df["pred_emd"].values / norm_factor
-            gt_quantile_normed = gt_df["gt"].values / norm_factor
+            pred_quantile_scaled = sample_df["pred_emd"].values / scale_factor
+            gt_quantile_scaled = gt_df["gt"].values / scale_factor
 
             # compute sinkhorn loss
             torch_res.append(
                 sinkhorn_loss_from_numpy(
-                    np.expand_dims(pred_quantile_normed, 0),
-                    np.expand_dims(gt_quantile_normed, 0),
+                    np.expand_dims(pred_quantile_scaled, 0),
+                    np.expand_dims(gt_quantile_scaled, 0),
                     self.dist_matrix,
                     mode="balancedSoftmax",
                 )
+            )
+
+            # compute MAE
+            mae_res.append(
+                np.mean(np.abs(pred_quantile_scaled - gt_quantile_scaled))
             )
 
             # normal normalization is necessary for normal evaluation
@@ -77,7 +86,15 @@ class EMDCalibrator(EMDWrapper):
                     self.dist_matrix,
                 )
             )
+            # # For testing Moran's I
+            # torch_res.append(
+            #     morans_obj(
+            #         torch.from_numpy(np.expand_dims(pred_vals.values, 0)),
+            #         torch.from_numpy(np.expand_dims(gt_vals.values, 0)),
+            #     )
+            # )
         print("Spearman", round(spearmanr(torch_res, emd_res)[0], 4))
+        print("Spearman with MAE", round(spearmanr(emd_res, mae_res)[0], 4))
         return torch_res, emd_res
 
 
@@ -190,9 +207,11 @@ if __name__ == "__main__":
         single_station_res["steps_ahead"] == 0
     ]
 
-    calib = EMDCalibrator(stations, single_station_res.drop("pred", axis=1))
-    torch_res, emd_res = calib(
-        single_station_res, None, mode="station_to_station"
+    calib = EMDCalibrator(
+        stations,
+        single_station_res.drop("pred", axis=1),
+        mode="station_to_station"
     )
+    torch_res, emd_res = calib(single_station_res)
     plt.scatter(emd_res, torch_res)
     plt.show()

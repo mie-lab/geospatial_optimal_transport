@@ -64,6 +64,7 @@ STATION_PATH = {
     "bikes_2015": "data/bikes/stations_2015.csv",
     "carsharing": "data/carsharing/zurich_stations.csv",
     "charging": "data/charging/stations.csv",
+    "traffic": "data/traffic/cost.csv",
 }
 
 DATA_PATH = {
@@ -71,6 +72,7 @@ DATA_PATH = {
     "bikes_2015": "data/bikes/data_2015.csv",
     "carsharing": "data/carsharing/zurich_data.csv",
     "charging": "data/charging/test_data.csv",
+    "traffic": "data/traffic/data.csv",
 }
 
 FREQUENCY = {
@@ -78,6 +80,17 @@ FREQUENCY = {
     "bikes_2015": "1h",
     "charging": "15min",
     "carsharing": "30min",
+    "traffic": "5min",
+}
+
+# how to aggregate the values when clustering -> sum for demand stuff, mean for
+# e.g. traffic
+AGG_FUNCTION = {
+    "bikes": "sum",
+    "bikes_2015": "sum",
+    "charging": "sum",
+    "carsharing": "sum",
+    "traffic": "mean",
 }
 
 SPEED_FACTOR = {"bikes": 10, "bikes_2015": 10, "carsharing": 10, "charging": 10}

@@ -104,8 +104,10 @@ def compare_emd(
             res["station_wise_error"] = res["error"] / res["nr_of_stations"]
 
         # compute EMD
-        emd_compute = EMDWrapper(stations, gt_reference)
-        emd_out = emd_compute(res, res_hierarchy, mode=emd_mode)
+        emd_compute = EMDWrapper(
+            stations, gt_reference, res_hierarchy, mode=emd_mode
+        )
+        emd_out = emd_compute(res)
 
         # trick to add the result two times if the clustering method is None
         for cluster_method in clustering_method:
@@ -116,14 +118,14 @@ def compare_emd(
                     "clustering": cluster_method,
                     "loss": loss_fn,
                     "EMD": np.mean(emd_out["Wasserstein"].values),
-                    "EMD_std": np.std(emd_out["Wasserstein"].values),
                     "OT unbalanced": np.mean(emd_out["OT unbalanced"].values),
                     "Sinkhorn": np.mean(emd_out["sinkhorn"].values),
                     "MAE": res["error"].mean(),
-                    "MAE std": res["error"].std(),
                     "MSE": res["mse_error"].mean(),
                     "station-wise MAE": res["station_wise_error"].mean(),
+                    "MAE std": res["error"].std(),
                     "station-wise MAE std": res["station_wise_error"].std(),
+                    "EMD_std": np.std(emd_out["Wasserstein"].values),
                 }
             )
         print(emd_results[-1])
@@ -188,7 +190,7 @@ def loss_comparison(results, out_path):
         plt.savefig(os.path.join(out_path, f"lossbar_{var}.pdf"))
 
 
-def correlate_mae_emd(single_station_res, out_path):
+def correlate_mae_emd(single_station_res, out_path, mode="station_to_station"):
     stations = load_stations(DATASET)
     # ger error
     single_station_res["MAE"] = (
@@ -200,8 +202,13 @@ def correlate_mae_emd(single_station_res, out_path):
         ].mean()
     )
     # get emd
-    emdwrap = EMDWrapper(stations, single_station_res.drop("pred", axis=1))
-    emd = emdwrap(single_station_res, None, mode="station_to_station")
+    emdwrap = EMDWrapper(
+        stations,
+        single_station_res.drop("pred", axis=1),
+        res_hierarchy=None,
+        mode=mode,
+    )
+    emd = emdwrap(single_station_res)
     # join
     together = pd.merge(
         mae_per_sample,
@@ -225,6 +232,13 @@ if __name__ == "__main__":
         "--redo", action="store_true", help="for processing the results again"
     )
     parser.add_argument(
+        "-m",
+        "--mode",
+        type=str,
+        default="group_to_group",
+        help="EMD mode: station_to_station / group_to_station / group_to_group",
+    )
+    parser.add_argument(
         "--steps_ahead",
         default=-1,
         type=int,
@@ -244,7 +258,9 @@ if __name__ == "__main__":
 
     # compute normal results
     if args.redo or not os.path.exists(out_path):
-        emd_results = compare_emd(comp_path, filter_step=args.steps_ahead)
+        emd_results = compare_emd(
+            comp_path, filter_step=args.steps_ahead, emd_mode=args.mode
+        )
         emd_results.to_csv(os.path.join(out_path, f"results.csv"), index=False)
     else:
         # if they already exist, load results
@@ -256,4 +272,4 @@ if __name__ == "__main__":
     make_plots_basic(emd_results, out_path)
 
     single_station_res = get_singlestations_file(comp_path)
-    correlate_mae_emd(single_station_res, out_path)
+    correlate_mae_emd(single_station_res, out_path, mode=args.mode)

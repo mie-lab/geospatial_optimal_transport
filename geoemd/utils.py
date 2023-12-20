@@ -1,8 +1,14 @@
 import numpy as np
 import argparse
 import collections
-from geoemd.config import CONFIG, QUADRATIC_TIME
 from scipy.spatial.distance import cdist
+import wasserstein
+
+from geoemd.loss.sinkhorn_loss import (
+    CombinedLoss,
+    SinkhornLoss,
+)
+from geoemd.config import CONFIG, QUADRATIC_TIME, STEPS_AHEAD, FREQUENCY
 
 
 def argument_parsing():
@@ -136,7 +142,7 @@ def create_groups_with_pred(pred, val, step_ahead, station_groups):
     return groups_with_pred
 
 
-def get_dataset_name(in_path_data):
+def get_dataset_name(in_path_data: str) -> str:
     if "bikes" in in_path_data and "2015" in in_path_data:
         return "bikes_2015"
     elif "bikes" in in_path_data:
@@ -145,8 +151,40 @@ def get_dataset_name(in_path_data):
         return "charging"
     elif "carsharing" in in_path_data:
         return "carsharing"
+    elif "traffic" in in_path_data:
+        return "traffic"
     else:
         raise ValueError("In path wrong, does not match available dataset")
+
+
+def get_emd_loss_function(loss_fn_argument: str, time_dist_matrix: np.ndarray):
+    # make spatiotemporal cost matrix
+    if "temporal" in loss_fn_argument:
+        spatiotemporal_cost = spacetime_cost_matrix(
+            time_dist_matrix,
+            time_steps=STEPS_AHEAD,
+        )
+    if loss_fn_argument == "emdbalancedspatial":
+        return CombinedLoss(time_dist_matrix, mode="balancedSoftmax")
+    elif loss_fn_argument == "emdbalancedspatiotemporal":
+        # actually combined sinkhorn temporal
+        return CombinedLoss(
+            spatiotemporal_cost, spatiotemporal=True, mode="balancedSoftmax"
+        )
+    elif loss_fn_argument == "emdunbalancedspatial":
+        return SinkhornLoss(
+            time_dist_matrix, mode="unbalanced", spatiotemporal=False
+        )
+        # training_kwargs["pl_trainer_kwargs"] = {"gradient_clip_val": 1}
+    elif loss_fn_argument == "emdunbalancedspatiotemporal":
+        return SinkhornLoss(
+            spatiotemporal_cost, mode="unbalanced", spatiotemporal=True
+        )
+    else:
+        raise NotImplementedError(
+            "Must be emdbalancedspatial, emdunbalancedspatial,\
+                    emdunbalancedspatiotemporalor emdbalancedspatiotemporal"
+        )
 
 
 def space_cost_matrix(
@@ -157,6 +195,7 @@ def space_cost_matrix(
     quadratic_factor=QUADRATIC_TIME,
 ):
     """
+    coords: spatial coordinates (projected, distances in m)
     speed_factor: relocation speed of users (in km/h)
     """
     if coords2 is None:
@@ -165,7 +204,7 @@ def space_cost_matrix(
 
     # convert space to time (in h)
     if speed_factor is not None:
-        time_matrix = dist_matrix / speed_factor
+        time_matrix = (dist_matrix / 1000) / speed_factor
     else:
         time_matrix = dist_matrix
 
@@ -208,3 +247,17 @@ def spacetime_cost_matrix(
                     time_matrix, waiting_time * np.ones(time_matrix.shape)
                 )
     return final_cost_matrix
+
+
+def balanced_ot_with_unbalanced_data(pred_vals, real_vals, dist_matrix):
+    dist_matrix_normed = dist_matrix / np.max(dist_matrix)
+
+    pred_vals_normed = pred_vals / np.sum(pred_vals) * np.sum(real_vals)
+    was = wasserstein.EMD()
+    emd1 = was(pred_vals_normed, real_vals, dist_matrix_normed)
+
+    # other way round
+    real_vals_normed = real_vals / np.sum(real_vals) * np.sum(pred_vals)
+    was = wasserstein.EMD()
+    emd2 = was(pred_vals, real_vals_normed, dist_matrix_normed)
+    return emd1, emd2
