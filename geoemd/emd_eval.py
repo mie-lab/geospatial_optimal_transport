@@ -167,6 +167,7 @@ class EMDWrapper:
                 gt_vals,
                 self.dist_matrix,
             )
+
             # compute sinkhorn loss with geomloss package
             gt_tensor = torch.tensor([gt_vals.tolist()])
             pred_tensor = torch.tensor([pred_vals.tolist()])
