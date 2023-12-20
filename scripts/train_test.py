@@ -7,20 +7,16 @@ from darts.dataprocessing.transformers import MinTReconciliator
 from scipy.spatial.distance import cdist
 
 from geoemd.model_wrapper import ModelWrapper, CovariateWrapper
-from geoemd.hierarchy.hierarchy_utils import add_demand_groups
-from geoemd.hierarchy.full_station_hierarchy import FullStationHierarchy
+from geoemd.hierarchy.hierarchy_utils import construct_series_with_hierarchy
 from geoemd.hierarchy.clustering_hierarchy import SpatialClustering
 from geoemd.utils import (
     argument_parsing,
     construct_name,
     get_dataset_name,
-    spacetime_cost_matrix,
+    get_emd_loss_function,
     space_cost_matrix,
 )
-from geoemd.loss.sinkhorn_loss import (
-    CombinedLoss,
-    SinkhornLoss,
-)
+from geoemd.io import load_time_series_data, load_stations
 from geoemd.parameter_optimization import OptunaOptimizer
 from geoemd.loss.distribution_loss import StepwiseCrossentropy, DistributionMSE
 from geoemd.config import (
@@ -30,6 +26,7 @@ from geoemd.config import (
     TEST_SAMPLES,
     MAX_COUNT,
     SPEED_FACTOR,
+    AGG_FUNCTION,
     FREQUENCY,
 )
 import warnings
@@ -55,35 +52,6 @@ def clean_single_pred(pred, pred_or_gt="pred", clip=True, apply_exp=False):
     if clip:
         result_as_df[pred_or_gt].clip(0, MAX_COUNT, inplace=True)
     return result_as_df
-
-
-def load_data(in_path_data, in_path_stations, pivot=False):
-    demand_df = pd.read_csv(in_path_data)
-    stations_locations = pd.read_csv(in_path_stations).set_index("station_id")
-    demand_df["timeslot"] = pd.to_datetime(demand_df["timeslot"])
-    # OPTIONAL: make even smaller excerpt
-    # stations_included = stations_locations.sample(50).index
-    # stations_locations = stations_locations[
-    #     stations_locations.index.isin(stations_included)
-    # ]
-    # # reduce demand matrix shape
-    # demand_agg = demand_agg[stations_included]
-    # print(demand_agg.shape)
-    # pivot if necessary
-    if "station_id" in demand_df.columns:
-        print("pivoting")
-        demand_df = demand_df.pivot(
-            index="timeslot", columns="station_id", values="count"
-        ).fillna(0)
-        demand_df = (
-            demand_df.reset_index()
-            .rename_axis(None, axis=1)
-            .set_index("timeslot")
-        )
-    else:
-        demand_df.set_index("timeslot", inplace=True)
-    print("Demand matrix", demand_df.shape)
-    return demand_df, stations_locations
 
 
 def train_and_test(
@@ -237,94 +205,70 @@ if __name__ == "__main__":
 
     dataset = get_dataset_name(in_path_data)
 
-    # TODO: set pivot argument of load_data
-    demand_agg, stations_locations = load_data(in_path_data, in_path_stations)
+    demand_agg = load_time_series_data(in_path_data)
 
-    # construct hierarchy
-    if args.hierarchy and args.y_clustermethod == "agg":
-        station_hierarchy = FullStationHierarchy()
-        if "0" in demand_agg.columns:
-            demand_agg.drop("0", axis=1, inplace=True)
-            stations_locations = stations_locations[
-                stations_locations.index != 0
-            ]
-        station_hierarchy.init_from_station_locations(stations_locations)
-        demand_agg = add_demand_groups(demand_agg, station_hierarchy.hier)
-    elif args.y_clustermethod is not None:
-        station_hierarchy = SpatialClustering(stations_locations)
-        station_hierarchy(
-            clustering_method=args.y_clustermethod, n_clusters=args.y_cluster_k
-        )
-        # transform the demand to get the grouped df
-        demand_agg = station_hierarchy.transform_demand(
-            demand_agg, hierarchy=args.hierarchy
-        )
-
-    if dataset in ["bikes", "bikes_2015", "carsharing"]:
-        norm_factor = np.quantile(demand_agg.values, 0.95)
-    elif dataset == "charging":
-        norm_factor = 3  # at most 3 cars are charging
-    else:
-        raise NotImplementedError("only bikes and charging implemented")
-
-    # init time series
+    # if we want to train with a darts hierarchy
     if args.hierarchy:
-        # initialize time series with hierarchy
-        shared_demand_series = TimeSeries.from_dataframe(
-            demand_agg,
-            freq=FREQUENCY[dataset],
-            hierarchy=station_hierarchy.get_darts_hier(),
-            fillna_value=0,
+        assert (
+            args.y_clustermethod == "agg" and dataset != "traffic"
+        ), "Only agglomerative clustering implemented and not for traffic data"
+        main_time_series = construct_series_with_hierarchy(
+            demand_agg, in_path_stations, FREQUENCY[dataset]
         )
     else:
-        shared_demand_series = TimeSeries.from_dataframe(
+        # for just clustering and training on the clustered data
+        if args.y_clustermethod is not None:
+            station_hierarchy = SpatialClustering(
+                in_path_stations, is_cost_matrix=(dataset == "traffic")
+            )
+            station_hierarchy(
+                clustering_method=args.y_clustermethod,
+                n_clusters=args.y_cluster_k,
+            )
+            # transform the demand to get the grouped df
+            demand_agg = station_hierarchy.transform_demand(
+                demand_agg,
+                hierarchy=args.hierarchy,
+                agg_func=AGG_FUNCTION[dataset],
+            )
+        # no clustering
+        print("time series after preprocessing", demand_agg.shape)
+        main_time_series = TimeSeries.from_dataframe(
             demand_agg, freq=FREQUENCY[dataset], fillna_value=0
         )
 
+    # get norm factor
+    norm_factor = np.quantile(demand_agg.values, 0.95)
+    print("Normalize dividing by", norm_factor)
+    # derive name for saving
     out_name, training_kwargs = construct_name(args)
 
     # Initialize loss function
     if "emd" in args.x_loss_function:
-        # sort stations by the same order as the demand columns
         if args.y_clustermethod is not None:
-            station_coords = station_hierarchy.groups_coordinates.loc[
+            # get dist matrix (between groups!)
+            time_dist_matrix = station_hierarchy.get_clustered_cost_matrix(
                 demand_agg.columns
-            ].values
+            )
+        # if we don't have a clustering, we need to create the cost matrix
         else:
-            station_coords = stations_locations.loc[
-                demand_agg.columns, ["x", "y"]
-            ].values
-        # pairwise distance between stations (in terms of travel time)
-        time_dist_matrix = space_cost_matrix(station_coords)
+            # load stations -> either cost matrix or list of spatial coords
+            stations = load_stations(in_path_stations)
+            if dataset == "traffic":
+                # simply the values of the cost matrix
+                assert all(stations.index == demand_agg.columns)
+                time_dist_matrix = stations.values
+            else:
+                station_coords = stations.loc[
+                    demand_agg.columns, ["x", "y"]
+                ].values
+                # pairwise distance between stations (in terms of travel time)
+                time_dist_matrix = space_cost_matrix(station_coords)
+        # sort stations by the same order as the demand columns
         # TODO: , speed_factor=SPEED_FACTOR[dataset], quadratic=False
-        if "temporal" in args.x_loss_function:
-            spatiotemporal_cost = spacetime_cost_matrix(
-                time_dist_matrix,
-                time_steps=STEPS_AHEAD,
-            )
-        if args.x_loss_function == "emdbalancedspatial":
-            training_kwargs["loss_fn"] = CombinedLoss(
-                time_dist_matrix, mode="balancedSoftmax"
-            )
-        elif args.x_loss_function == "emdbalancedspatiotemporal":
-            # actually combined sinkhorn temporal
-            training_kwargs["loss_fn"] = CombinedLoss(
-                spatiotemporal_cost, spatiotemporal=True, mode="balancedSoftmax"
-            )
-        elif args.x_loss_function == "emdunbalancedspatial":
-            training_kwargs["loss_fn"] = SinkhornLoss(
-                time_dist_matrix, mode="unbalanced", spatiotemporal=False
-            )
-            # training_kwargs["pl_trainer_kwargs"] = {"gradient_clip_val": 1}
-        elif args.x_loss_function == "emdunbalancedspatiotemporal":
-            training_kwargs["loss_fn"] = SinkhornLoss(
-                spatiotemporal_cost, mode="unbalanced", spatiotemporal=True
-            )
-        else:
-            raise NotImplementedError(
-                "Must be emdbalancedspatial, emdunbalancedspatial,\
-                     emdunbalancedspatiotemporalor emdbalancedspatiotemporal"
-            )
+        training_kwargs["loss_fn"] = get_emd_loss_function(
+            args.x_loss_function, time_dist_matrix
+        )
     elif args.x_loss_function == "distribution":
         training_kwargs["loss_fn"] = DistributionMSE()
     elif args.x_loss_function == "crossentropy":
@@ -336,7 +280,7 @@ if __name__ == "__main__":
 
     # Run model comparison
     train_and_test(
-        shared_demand_series,
+        main_time_series,
         norm_factor=norm_factor,
         ordered_test_samples=ordered_test_samples,
         **training_kwargs,

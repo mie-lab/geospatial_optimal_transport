@@ -1,8 +1,14 @@
 import os
 import json
 import pandas as pd
+from sklearn.cluster import AgglomerativeClustering
 
-from geoemd.hierarchy.hierarchy_utils import cluster_agglomerative
+
+def cluster_agglomerative(station_locations):
+    # cluster the stations
+    clustering = AgglomerativeClustering(distance_threshold=0, n_clusters=None)
+    clustering.fit(station_locations[["x", "y"]])
+    return clustering.children_
 
 
 class FullStationHierarchy:

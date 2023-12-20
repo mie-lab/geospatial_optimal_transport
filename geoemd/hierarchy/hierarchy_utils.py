@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
+from darts import TimeSeries
+from geoemd.hierarchy.full_station_hierarchy import FullStationHierarchy
+from geoemd.io import load_stations
 
 
 def aggregate_bookings_deprecated(demand_df, agg_by="day"):
@@ -120,13 +123,6 @@ def test_hierarchy(bookings_agg, hierarchy, test_node=800):
     assert all(bookings_agg[test_node] == summed)
 
 
-def cluster_agglomerative(station_locations):
-    # cluster the stations
-    clustering = AgglomerativeClustering(distance_threshold=0, n_clusters=None)
-    clustering.fit(station_locations[["x", "y"]])
-    return clustering.children_
-
-
 def add_demand_groups(demand_agg, hier):
     """Add groups of station to time series dataframe"""
     demand_agg.columns = demand_agg.columns.astype(str)
@@ -136,3 +132,23 @@ def add_demand_groups(demand_agg, hier):
             demand_agg[pair[0]].values + demand_agg[pair[1]].values
         )
     return demand_agg
+
+
+def construct_series_with_hierarchy(
+    demand_agg: pd.DataFrame, in_path_stations: str, frequency: str
+):
+    stations_locations = load_stations(in_path_stations)
+    station_hierarchy = FullStationHierarchy()
+    if "0" in demand_agg.columns:
+        demand_agg.drop("0", axis=1, inplace=True)
+        stations_locations = stations_locations[stations_locations.index != 0]
+    station_hierarchy.init_from_station_locations(stations_locations)
+    demand_agg = add_demand_groups(demand_agg, station_hierarchy.hier)
+    # initialize time series with hierarchy
+    main_time_series = TimeSeries.from_dataframe(
+        demand_agg,
+        freq=frequency,
+        hierarchy=station_hierarchy.get_darts_hier(),
+        fillna_value=0,
+    )
+    return main_time_series
