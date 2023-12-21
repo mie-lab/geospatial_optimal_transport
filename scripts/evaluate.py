@@ -48,9 +48,13 @@ def compare_emd(
     if split_by_fraction:
         data = pd.read_csv(DATA_PATH[DATASET])
         # pivot
-        data = data.pivot(
-            index="timeslot", columns="station_id", values="count"
-        ).fillna(0)
+        if "station_id" in data.columns:
+            data = data.pivot(
+                index="timeslot", columns="station_id", values="count"
+            ).fillna(0)
+        else:
+            data = data.set_index("timeslot")
+            data.columns = data.columns.astype(int)
         # reduce to training data
         data = data[: int(TRAINTEST_SPLIT * len(data))]
 
@@ -193,34 +197,11 @@ def loss_comparison(results, out_path):
         plt.savefig(os.path.join(out_path, f"lossbar_{var}.pdf"))
 
 
-def correlate_mae_emd(single_station_res, out_path, mode="station_to_station"):
-    stations = load_stations(DATASET)
-    # ger error
-    single_station_res["MAE"] = (
-        single_station_res["gt"] - single_station_res["pred"]
-    ).abs()
-    mae_per_sample = pd.DataFrame(
-        single_station_res.groupby(["val_sample_ind", "steps_ahead"])[
-            "MAE"
-        ].mean()
-    )
-    # get emd
-    emdwrap = EMDWrapper(
-        stations,
-        single_station_res.drop("pred", axis=1),
-        res_hierarchy=None,
-        mode=mode,
-    )
-    emd = emdwrap(single_station_res)
-    # join
-    together = pd.merge(
-        mae_per_sample,
-        emd,
-        left_index=True,
-        right_on=["val_sample_ind", "steps_ahead"],
-    )
+def correlate_mae_emd(out_path):
+    # load results
+    single_station_res = get_singlestations_file(out_path)
     plt.figure(figsize=(6, 4))
-    plt.scatter(together["MAE"], together["EMD"])
+    plt.scatter(single_station_res["MAE"], single_station_res["EMD"])
     plt.ylabel("EMD")
     plt.xlabel("MAE")
     plt.tight_layout()
@@ -277,5 +258,4 @@ if __name__ == "__main__":
     # compare aggregation layers
     make_plots_basic(emd_results, out_path)
 
-    single_station_res = get_singlestations_file(comp_path)
-    correlate_mae_emd(single_station_res, out_path, mode=args.mode)
+    correlate_mae_emd(out_path)

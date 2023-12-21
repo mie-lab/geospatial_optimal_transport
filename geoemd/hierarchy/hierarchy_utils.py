@@ -75,6 +75,75 @@ def add_fraction_to_hierarchy(res_hierarchy, train_data):
     return hierarchy_with_fractions
 
 
+def clustered_cost_matrix(
+    cost_matrix: pd.DataFrame, cluster_list: list
+) -> np.ndarray:
+    """
+    Compute cost matrix between a pair of clusters
+    Args:
+        cost_matrix (pd.DataFrame): dataframe with one row and one col per
+            station, where the values indicate the cost between a pair
+        cluster_list (list): list of cluster names
+
+    Returns:
+        np.ndarray: matrix with one row per cluster and one column per cluster
+    """
+    assert (
+        "cluster" in cost_matrix.columns
+    ), "cost_matrix requires column cluster"
+    time_dist_matrix = np.zeros((len(cluster_list), len(cluster_list)))
+    for i, cluster1 in enumerate(cluster_list):
+        for j, cluster2 in enumerate(cluster_list):
+            # only do it for i<j because i=j is 0 and others are
+            # added symmetrically
+            if i >= j:
+                continue
+            rows_cluster1 = cost_matrix[cost_matrix["cluster"] == cluster1]
+            columns_cluster2 = (
+                cost_matrix[cost_matrix["cluster"] == cluster2]
+            ).index.astype(str)
+            cost_to_other_cluster = rows_cluster1[columns_cluster2]
+
+            # fill symmetrically with mean
+            time_dist_matrix[i, j] = np.mean(cost_to_other_cluster)
+            time_dist_matrix[j, i] = np.mean(cost_to_other_cluster)
+    return time_dist_matrix
+
+
+def group_to_station_cost_matrix(
+    cost_matrix: pd.DataFrame, cluster_list: list
+) -> np.ndarray:
+    """
+    Compute cost matrix between clusters and individual stations
+    Args:
+        cost_matrix (pd.DataFrame): dataframe with one row and one col per
+            station, where the values indicate the cost between a pair
+        cluster_list (list): list of cluster names
+
+    Returns:
+        np.ndarray: matrix with one row per cluster and one column per cluster
+    """
+    assert (
+        "cluster" in cost_matrix.columns
+    ), "cost_matrix requires column cluster"
+    # group_to_station -> between cluster and single stations = len(cost_matrix)
+    time_dist_matrix = np.zeros((len(cluster_list), len(cost_matrix)))
+
+    for i, cluster in enumerate(cluster_list):
+        for j, station in enumerate(cost_matrix.index):
+            # only do it for i<j because i=j is 0 and others are
+            # added symmetrically
+            if i >= j:
+                continue
+            rows_cluster1 = cost_matrix[cost_matrix["cluster"] == cluster]
+            cost_to_station = rows_cluster1[station]
+
+            # fill symmetrically with mean
+            time_dist_matrix[i, j] = np.mean(cost_to_station)
+            time_dist_matrix[j, i] = np.mean(cost_to_station)
+    return time_dist_matrix
+
+
 # # Deprecated
 # def demand_hierarchy(bookings_agg, linkage, nr_samples=len(stations_locations)):
 #     # initialize hierarchy

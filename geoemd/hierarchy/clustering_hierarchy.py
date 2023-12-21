@@ -4,6 +4,7 @@ import numpy as np
 from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.cluster import SpectralClustering
 from geoemd.utils import space_cost_matrix
+from geoemd.hierarchy.hierarchy_utils import clustered_cost_matrix
 
 clustering_dict = {"kmeans": KMeans, "agg": AgglomerativeClustering}
 
@@ -66,26 +67,9 @@ class SpatialClustering:
         else:
             # cluster the original cost matrix by the clusters
             # avg distance from these points to the ones from another cluster
-            time_dist_matrix = np.zeros(
-                (len(time_series_cols), len(time_series_cols))
+            time_dist_matrix = clustered_cost_matrix(
+                self.stations, time_series_cols
             )
-            for i, cluster1 in enumerate(time_series_cols):
-                for j, cluster2 in enumerate(time_series_cols):
-                    # only do it for i<j because i=j is 0 and others are
-                    # added symmetrically
-                    if i >= j:
-                        continue
-                    rows_cluster1 = self.stations[
-                        self.stations["cluster"] == cluster1
-                    ]
-                    columns_cluster2 = (
-                        self.stations[self.stations["cluster"] == cluster2]
-                    ).index
-                    cost_to_other_cluster = rows_cluster1[columns_cluster2]
-
-                    # fill symmetrically with mean
-                    time_dist_matrix[i, j] = np.mean(cost_to_other_cluster)
-                    time_dist_matrix[j, i] = np.mean(cost_to_other_cluster)
         return time_dist_matrix
 
     def transform_demand(self, demand_df_inp, hierarchy=False, agg_func="mean"):

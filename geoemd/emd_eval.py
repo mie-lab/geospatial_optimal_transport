@@ -6,7 +6,11 @@ from scipy.spatial.distance import cdist
 import ot
 import torch
 
-from geoemd.hierarchy.hierarchy_utils import hierarchy_to_df
+from geoemd.hierarchy.hierarchy_utils import (
+    hierarchy_to_df,
+    clustered_cost_matrix,
+    group_to_station_cost_matrix,
+)
 from geoemd.utils import space_cost_matrix
 from geoemd.loss.sinkhorn_loss import SinkhornLoss
 from geoemd.loss.interpretable_unbalanced_ot import InterpretableUnbalancedOT
@@ -43,10 +47,49 @@ class EMDWrapper:
         assert self.stations.index.name == "station_id"
         self.stations.sort_index(inplace=True)
         # if no hierarchy, we have only station-wise data
-        if res_hierarchy is None:
+
+        # Case 1: stations have x and y coordinates -> make matrix with coords
+        if "x" in self.stations and "y" in self.stations:
+            self.make_dist_matrix_coords(quadratic_cost)
+        else:
+            self.make_dist_matrix_adjacency()
+
+    def make_dist_matrix_adjacency(self) -> None:
+        """Construct dist matrix from adjacency matrix"""
+        if self.mode == "station_to_station" or self.res_hierarchy is None:
+            self.dist_matrix = self.stations.values
+        else:
+            station_group_df = (
+                hierarchy_to_df(self.res_hierarchy)
+                .rename({"group": "cluster", "station": "station_id"}, axis=1)
+                .set_index("station_id")
+            )
+            self.stations = self.stations.merge(
+                station_group_df[["cluster"]],
+                left_index=True,
+                right_index=True,
+                how="left",
+            )
+            sorted_group_list = sorted(self.stations["cluster"].unique())
+            if self.mode == "group_to_station":
+                # compute average distances from cluster to individual stations
+                self.dist_matrix = group_to_station_cost_matrix(
+                    self.stations, sorted_group_list
+                )
+            elif self.mode == "group_to_group":
+                # compute average distance between clusters
+                self.dist_matrix = clustered_cost_matrix(
+                    self.stations, sorted_group_list
+                )
+            else:
+                raise ValueError("Invalid mode")
+
+    def make_dist_matrix_coords(self, quadratic_cost: bool) -> None:
+        """Construct dist matrix from x y station coordinates"""
+        if self.res_hierarchy is None:
             self.mode = "station_to_station"
         else:
-            coords_per_group = self.get_coords_per_group(res_hierarchy)
+            coords_per_group = self.get_coords_per_group()
 
         # make dist matrix --> TODO: load it directly for traffic data
         if self.mode == "station_to_station":
@@ -105,9 +148,9 @@ class EMDWrapper:
         # compute EMD
         return self.compute_emd(res_per_station)
 
-    def get_coords_per_group(self, res_hierarchy: dict) -> list:
+    def get_coords_per_group(self) -> list:
         # get groups
-        station_group_df = hierarchy_to_df(res_hierarchy)
+        station_group_df = hierarchy_to_df(self.res_hierarchy)
         coords_per_group = self.stations.merge(
             station_group_df, left_index=True, how="left", right_on="station"
         )
