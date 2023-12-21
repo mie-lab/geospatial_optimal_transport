@@ -90,7 +90,9 @@ AGG_FUNCTION = {
     "bikes_2015": "sum",
     "charging": "sum",
     "carsharing": "sum",
-    "traffic": "mean",
+    "traffic": "sum",
+    # TODO: now using sum because results for mean are all different
+    # works because traffic flow = 1/h --> can be interpreted as sum(cars) /h
 }
 
 SPEED_FACTOR = {"bikes": 10, "bikes_2015": 10, "carsharing": 10, "charging": 10}
