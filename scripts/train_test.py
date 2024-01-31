@@ -25,7 +25,6 @@ from geoemd.config import (
     TRAINVAL_SPLIT,
     TEST_SAMPLES,
     MAX_COUNT,
-    SPEED_FACTOR,
     AGG_FUNCTION,
     FREQUENCY,
 )
@@ -256,7 +255,7 @@ if __name__ == "__main__":
             stations = load_stations(in_path_stations)
             if dataset == "traffic":
                 # simply the values of the cost matrix
-                assert all(stations.index == demand_agg.columns)
+                assert all(stations.index.astype(str) == demand_agg.columns)
                 time_dist_matrix = stations.values
             else:
                 station_coords = stations.loc[

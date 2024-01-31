@@ -20,7 +20,7 @@ from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 # a period of 5 epochs (`patience`)
 early_stopper = EarlyStopping(
     monitor="val_loss",
-    patience=3,
+    patience=10,
     min_delta=0.00,
     mode="min",
 )
