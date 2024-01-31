@@ -13,13 +13,13 @@ scripts = []
 setup(
     name="geoemd",
     version="0.0.1",
-    description="Earth mover distance for spatiotemporal predictions",
+    description="Optimal Transport for spatiotemporal predictions",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
     author="MIE Lab",
     author_email=("nwiedemann@ethz.ch"),
     license="MIT",
-    url="https://github.com/mie-lab/multi-scale-prediction.git",
+    url="https://github.com/mie-lab/geospatial_optimal_transport.git",
     install_requires=[
         "numpy",
         "geopandas",

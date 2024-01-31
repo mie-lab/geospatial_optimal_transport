@@ -222,6 +222,9 @@ def spacetime_cost_matrix(
 ):
     """
     Design a space-time cost matrix that quantifies the cost across space and time
+    Cell i,j is the cost from timeslot=i//nr_stations and station=i%nr_stations
+    to timeslot=j//nr_stations and station=j%nr_stations
+
     dist_matrix: pairwise distances in m
     forward_cost: cost for using demand that was originally allocated for the
     preceding timestep (usually low) - in hours

@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+import argparse
 
 
 def deprecated_read_all_demand(base_path="data/bikes_montreal"):
@@ -310,12 +311,15 @@ def to_csv_td(df, out_path, time_col=["timeslot"]):
 
 
 if __name__ == "__main__":
-    # make_arbitrary_excerpt()
-    # exit()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--path", type=str, default="data/bikes_montreal")
+    args = parser.parse_args()
 
-    station_df, station_code_mapping = load_stations()
+    station_df, station_code_mapping = load_stations(base_path=args.path)
     station_df = project_locations(station_df)
-    pickup, dropoff = load_demand(station_code_mapping=station_code_mapping)
+    pickup, dropoff = load_demand(
+        base_path=args.path, station_code_mapping=station_code_mapping
+    )
 
     # fix gap
     pickup = fix_pickup_gap(pickup)
@@ -323,9 +327,9 @@ if __name__ == "__main__":
     check_gaps(pickup)
     check_gaps(dropoff)
 
-    station_df.to_csv("data/bikes_montreal/stations.csv", index=False)
-    to_csv_td(pickup, "data/bikes_montreal/pickup.csv")
-    to_csv_td(dropoff, "data/bikes_montreal/dropoff.csv")
+    station_df.to_csv(os.path.join(args.path, "stations.csv"), index=False)
+    to_csv_td(pickup, os.path.join(args.path, "pickup.csv"))
+    to_csv_td(dropoff, os.path.join(args.path, "dropoff.csv"))
 
     # # In order to only make the excerpt
     # pickup = pd.read_csv("data/bikes_montreal/pickup.csv")
@@ -338,6 +342,8 @@ if __name__ == "__main__":
     excerpt_dropoff = dropoff[
         dropoff["timeslot"] < excerpt_pickup["timeslot"].max()
     ]
-    to_csv_td(excerpt_pickup, "data/bikes_montreal/test_pickup.csv")
-    to_csv_td(excerpt_dropoff, "data/bikes_montreal/test_dropoff.csv")
-    stations_pruned.to_csv("data/bikes_montreal/test_stations.csv", index=False)
+    to_csv_td(excerpt_pickup, os.path.join(args.path, "test_pickup.csv"))
+    to_csv_td(excerpt_dropoff, os.path.join(args.path, "test_dropoff.csv"))
+    stations_pruned.to_csv(
+        os.path.join(args.path, "test_stations.csv"), index=False
+    )
