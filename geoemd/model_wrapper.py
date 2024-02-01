@@ -116,6 +116,7 @@ class ModelWrapper:
                 "torch_metrics": torchmetrics.MetricCollection(
                     torchmetrics.MeanSquaredError(), torch.nn.CrossEntropyLoss()
                 ),
+                "optimizer_kwargs": {"lr": 1e-5},
                 "pl_trainer_kwargs": {"callbacks": [early_stopper]},
             }
             if kwargs["x_scale"]:
