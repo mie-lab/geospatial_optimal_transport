@@ -8,6 +8,7 @@ from geoemd.loss.sinkhorn_loss import (
     CombinedLoss,
     SinkhornLoss,
 )
+from geoemd.loss.interpretable_unbalanced_ot import InterpretableUnbalancedOT
 from geoemd.config import CONFIG, QUADRATIC_TIME, STEPS_AHEAD, FREQUENCY
 
 
@@ -170,6 +171,12 @@ def get_emd_loss_function(loss_fn_argument: str, time_dist_matrix: np.ndarray):
         # actually combined sinkhorn temporal
         return CombinedLoss(
             spatiotemporal_cost, spatiotemporal=True, mode="balancedSoftmax"
+        )
+    elif loss_fn_argument == "emdinterpretablespatial":
+        return InterpretableUnbalancedOT(
+            time_dist_matrix,
+            spatiotemporal=False,
+            penalty_unb=np.quantile(time_dist_matrix, 0.1),
         )
     elif loss_fn_argument == "emdunbalancedspatial":
         return SinkhornLoss(

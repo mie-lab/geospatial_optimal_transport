@@ -12,7 +12,7 @@ class InterpretableUnbalancedOT:
         penalty_unb="max",
         compute_exact=False,
         norm_sum_1=False,
-        spatiotemporal=False
+        spatiotemporal=False,
     ):
         """
         Initialize unbalanced OT class with cost matrix
@@ -29,7 +29,7 @@ class InterpretableUnbalancedOT:
         extended_cost_matrix[:clen, :clen] = cost_matrix
         extended_cost_matrix[clen, :] = penalty_unb
         extended_cost_matrix[:, clen] = penalty_unb
-        
+
         if normalize_c:
             extended_cost_matrix = extended_cost_matrix / np.max(
                 extended_cost_matrix
@@ -38,31 +38,24 @@ class InterpretableUnbalancedOT:
             self.cost_matrix = extended_cost_matrix
             self.balancedOT = wasserstein.EMD()
         else:
-            # TODO: mode is balanced --> should be balancedSoftmax for backprop
             self.balancedOT = SinkhornLoss(
                 extended_cost_matrix,
                 blur=0.1,
                 reach=0.01,
                 scaling=0.1,
-                mode="balanced",
-                spatiotemporal=spatiotemporal
+                mode="unbalanced",
+                spatiotemporal=spatiotemporal,
             )
 
     def __call__(self, a, b):
         # compute mass that has to be imported or exported
-        diff = torch.sum(a, dim=-1) - torch.sum(b, dim=-1)
-        diff_tensor = (torch.ones(b.size()[:-1]) * diff).unsqueeze(0)
-        # concatenate it to one of the tensors such that we have
-        if diff > 0:  # TODO: doesn't work for batch
-            extended_a = torch.cat(
-                [a, torch.zeros(a.size()[:-1]).unsqueeze(0)], dim=-1
-            )
-            extended_b = torch.cat([b, diff_tensor], dim=-1)
-        else:
-            extended_a = torch.cat([a, diff_tensor * (-1)], dim=-1)
-            extended_b = torch.cat(
-                [b, torch.zeros(b.size()[:-1]).unsqueeze(0)], dim=-1
-            )
+        diff = (torch.sum(a, dim=-1) - torch.sum(b, dim=-1)).unsqueeze(-1)
+
+        diff_pos = torch.relu(diff)
+        diff_neg = torch.relu(diff * -1)
+
+        extended_a = torch.cat((a, diff_neg), dim=-1)
+        extended_b = torch.cat((b, diff_pos), dim=-1)
 
         if self.compute_exact:
             assert a.size()[0] == 1 and b.size()[0] == 1 and a.dim() == 2

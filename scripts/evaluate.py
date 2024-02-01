@@ -86,7 +86,7 @@ def compare_emd(
             clustering_method = ["agg", "kmeans"]  # add both
             nr_groups = len(stations)
             res_hierarchy = None
-            res["station_wise_error"] = res["error"]
+            res["station_wise_mae"] = res["error"]
         else:
             # load hierarchy
             with open(
@@ -108,7 +108,8 @@ def compare_emd(
                 left_on="group",
                 right_index=True,
             )
-            res["station_wise_error"] = res["error"] / res["nr_of_stations"]
+            res["station_wise_mae"] = res["error"] / res["nr_of_stations"]
+        res["station_wise_mse"] = res["station_wise_mae"] ** 2
 
         # compute EMD
         emd_compute = EMDWrapper(
@@ -131,7 +132,8 @@ def compare_emd(
                     "nr_group": nr_groups,
                     "clustering": cluster_method,
                     "loss": loss_fn,
-                    "station-wise MAE": res["station_wise_error"].mean(),
+                    "station-wise MAE": res["station_wise_mae"].mean(),
+                    "station-wise MSE": res["station_wise_mse"].mean(),
                 }
             )
             emd_results.append(base_dict)
