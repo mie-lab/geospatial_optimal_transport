@@ -13,6 +13,7 @@ __pycache__/
 *.sh
 deprecated.py
 backups/
+spatial_multi_scale_1D/
 paper/
 data/
 paper_sigspatial/

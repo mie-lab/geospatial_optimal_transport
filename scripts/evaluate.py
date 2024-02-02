@@ -218,6 +218,9 @@ if __name__ == "__main__":
         "--redo", action="store_true", help="for processing the results again"
     )
     parser.add_argument(
+        "--plot", action="store_true", help="whether to plot everything"
+    )
+    parser.add_argument(
         "-m",
         "--mode",
         type=str,
@@ -255,9 +258,10 @@ if __name__ == "__main__":
         # if they already exist, load results
         emd_results = pd.read_csv(os.path.join(out_path, f"results.csv"))
 
-    # compare losses
-    loss_comparison(emd_results, out_path)
-    # compare aggregation layers
-    make_plots_basic(emd_results, out_path)
+    if args.plot:
+        # compare losses
+        loss_comparison(emd_results, out_path)
+        # compare aggregation layers
+        make_plots_basic(emd_results, out_path)
 
-    correlate_mae_emd(out_path)
+        correlate_mae_emd(out_path)
