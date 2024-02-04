@@ -16,7 +16,7 @@ This installs the package called `geoemd` in your virtual environment, together 
 
 ### Data download and preprocessing:
 
-Public bike sharing data from Montreal were downloaded[here](https://www.kaggle.com/datasets/aubertsigouin/biximtl). A script is provided to read all data and to convert it into the hourly number of bike pick-ups per station:
+Public bike sharing data from Montreal were downloaded [here](https://www.kaggle.com/datasets/aubertsigouin/biximtl). A script is provided to read all data and to convert it into the hourly number of bike pick-ups per station:
 
 ```
 python preprocessing/bikes_montreal.py --path path/to/downloaded/folder
