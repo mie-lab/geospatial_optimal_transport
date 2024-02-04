@@ -13,7 +13,7 @@ from geoemd.hierarchy.hierarchy_utils import (
 )
 from geoemd.utils import space_cost_matrix
 from geoemd.loss.sinkhorn_loss import SinkhornLoss
-from geoemd.loss.interpretable_unbalanced_ot import InterpretableUnbalancedOT
+from geoemd.loss.partial_ot import InterpretableUnbalancedOT
 from geoemd.config import SPEED_FACTOR
 
 """
@@ -187,19 +187,19 @@ class EMDWrapper:
         )
         # Wasserstein distance -> also computed with normalized costs
         was = wasserstein.EMD()
-        dist_matrix_normed = self.dist_matrix / np.max(self.dist_matrix)
+        # dist_matrix_normed = self.dist_matrix / np.max(self.dist_matrix)
 
         # Unbalanced OT is computed with 0.1 quantile and with max cost
         unb_ot_01quantile = InterpretableUnbalancedOT(
             self.dist_matrix,
             compute_exact=True,
-            normalize_c=True,
+            normalize_c=False,
             penalty_unb=np.quantile(self.dist_matrix, 0.1),
         )
         unb_ot_max = InterpretableUnbalancedOT(
             self.dist_matrix,
             compute_exact=True,
-            normalize_c=True,
+            normalize_c=False,
             penalty_unb=np.max(self.dist_matrix),
         )
 
@@ -216,7 +216,8 @@ class EMDWrapper:
             )
             gt_vals = gt_df["gt"].values
             # normalize pred by aligning to gt vals
-            pred_vals_normed = pred_vals / np.sum(pred_vals) * np.sum(gt_vals)
+            # pred_vals_normed = pred_vals / np.sum(pred_vals) # * np.sum(gt_vals)
+            gt_vals_normed = gt_vals / np.sum(gt_vals) * np.sum(pred_vals)
 
             # compute base error metrics
             mae = (sample_df["pred"] - sample_df["gt"]).abs()
@@ -224,9 +225,9 @@ class EMDWrapper:
 
             # 1) compute wasserstein (wo entropy regularization, normalized C
             emd_distance = was(
-                pred_vals_normed,
-                gt_vals,
-                dist_matrix_normed,
+                pred_vals,
+                gt_vals_normed,
+                self.dist_matrix,
             )
 
             # 2) compute total error
