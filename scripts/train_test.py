@@ -4,7 +4,6 @@ import time
 import numpy as np
 from darts import TimeSeries, concatenate
 from darts.dataprocessing.transformers import MinTReconciliator
-from scipy.spatial.distance import cdist
 
 from geoemd.model_wrapper import ModelWrapper, CovariateWrapper
 from geoemd.hierarchy.hierarchy_utils import construct_series_with_hierarchy

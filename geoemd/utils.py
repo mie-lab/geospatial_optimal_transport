@@ -8,7 +8,7 @@ from geoemd.loss.sinkhorn_loss import (
     CombinedLoss,
     SinkhornLoss,
 )
-from geoemd.loss.interpretable_unbalanced_ot import InterpretableUnbalancedOT
+from geoemd.loss.partial_ot import InterpretableUnbalancedOT
 from geoemd.config import CONFIG, QUADRATIC_TIME, STEPS_AHEAD, FREQUENCY
 
 
