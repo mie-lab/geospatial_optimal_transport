@@ -1,3 +1,4 @@
+from datetime import datetime
 import pandas as pd
 
 # NOTE: The Jupyter notebook by Arthur et al was used to preprocess the data:
@@ -53,9 +54,17 @@ charging_per_station = charging_per_station[charging_per_station > 0]
 included_stations = charging_per_station.index
 
 train_merged = train_merged[train_merged["station_id"].isin(included_stations)]
-train_merged.to_csv("data/charging/data_check.csv", index=False)
+train_merged.to_csv("data/charging/data.csv", index=False)
 
 # reduce stations:
 stations = pd.read_csv("data/raw_charging_stations/stations.csv")
 stations = stations[stations["station_id"].isin(included_stations.astype(int))]
-stations.to_csv("data/charging/stations_check.csv", index=False)
+stations.to_csv("data/charging/stations.csv", index=False)
+
+
+# make a subset for tuning:
+data = pd.read_csv("data/charging/data.csv")
+data["timeslot"] = pd.to_datetime(data["timeslot"])
+corona_date = datetime.strptime("2020-10-18 00:00:00", '%Y-%m-%d %H:%M:%S')
+test_data = data[data["timeslot"] > corona_date]
+test_data.to_csv("data/charging/test_data.csv", index=False)
