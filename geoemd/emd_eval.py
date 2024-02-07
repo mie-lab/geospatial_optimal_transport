@@ -189,19 +189,25 @@ class EMDWrapper:
         was = wasserstein.EMD()
         # dist_matrix_normed = self.dist_matrix / np.max(self.dist_matrix)
 
-        # Unbalanced OT is computed with 0.1 quantile and with max cost
-        unb_ot_01quantile = InterpretableUnbalancedOT(
+        # Unbalanced OT is computed with different quantiles
+        partial_ot_objects = []
+        quantile_range = [0] + np.arange(0.1, 1.1, 0.1).tolist() +  [1.5 * np.max(self.dist_matrix)]
+        names = ["quantile_"+str(i) for i in range(11)] + ["1.5max"]
+        penalty_mapping = {}
+        for i in range(len(quantile_range)):
+            if "quantile" in names[i]:
+                penalty = np.quantile(self.dist_matrix, quantile_range[i])
+            else:
+                penalty = quantile_range[i]
+            penalty_mapping[names[i]] = penalty
+            # print(names[i], penalty)
+            partial_ot_objects.append(InterpretableUnbalancedOT(
             self.dist_matrix,
             compute_exact=True,
             normalize_c=False,
-            penalty_unb=np.quantile(self.dist_matrix, 0.1),
-        )
-        unb_ot_max = InterpretableUnbalancedOT(
-            self.dist_matrix,
-            compute_exact=True,
-            normalize_c=False,
-            penalty_unb=np.max(self.dist_matrix),
-        )
+            penalty_unb=penalty,
+        ))
+        print(penalty_mapping)
 
         emd = []
         for (val_sample, steps_ahead), sample_df in res_per_station.groupby(
@@ -238,15 +244,8 @@ class EMDWrapper:
             pred_tensor = torch.from_numpy(pred_vals).unsqueeze(0)
             sinkhorn_loss = sinkhorn(pred_tensor, gt_tensor)
 
-            # 4) unbalanced ot
-            unb_ot_01quantile_res = unb_ot_01quantile(pred_tensor, gt_tensor)
-            unb_ot_max_res = unb_ot_max(pred_tensor, gt_tensor)
-
-            emd.append(
-                {
+            base_dict =  {
                     "EMD": emd_distance,
-                    "Unb_OT_01quantile": unb_ot_01quantile_res,
-                    "Unb_OT_max": unb_ot_max_res,
                     "total_error": total_error,
                     "MAE": np.mean(mae),
                     "MSE": np.mean(mse),
@@ -254,6 +253,11 @@ class EMDWrapper:
                     "val_sample_ind": val_sample,
                     "steps_ahead": steps_ahead,
                 }
-            )
+            
+            # 4) unbalanced ot
+            for i in range(len(names)):
+                unb_ot_res = partial_ot_objects[i](pred_tensor, gt_tensor)
+                base_dict[f"unb_ot_{names[i]}"] = unb_ot_res
+            emd.append(base_dict)
 
         return pd.DataFrame(emd)
