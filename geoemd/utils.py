@@ -173,16 +173,16 @@ def get_emd_loss_function(loss_fn_argument: str, time_dist_matrix: np.ndarray):
             penalty_unb=np.quantile(cost_matrix, 0.1),
         ),
         "emdsinkhornspatial": SinkhornLoss(
-            time_dist_matrix, mode="unbalanced", spatiotemporal=True
+            time_dist_matrix, mode="unbalanced", spatiotemporal=False
         ),
         "emdsinkhornspatiotemporal": SinkhornLoss(
-            time_dist_matrix, mode="unbalanced", spatiotemporal=False
+            time_dist_matrix, mode="unbalanced", spatiotemporal=True
         ),
         "emdmoransispatial": MoransiCombinedLoss(
             cost_matrix, spatiotemporal=False
         ),
         "emdmoransispatiotemporal": MoransiCombinedLoss(
-            cost_matrix, spatiotemporal=False
+            cost_matrix, spatiotemporal=True
         ),
         "emdbalancedspatial": CombinedLoss(
             time_dist_matrix, mode="balancedSoftmax"
