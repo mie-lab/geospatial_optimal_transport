@@ -7,7 +7,15 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class MoransiLoss:
-    def __init__(self, C, normalize_c=True, spatiotemporal=False, apply_sqrt=True, **kwargs):
+    def __init__(
+        self,
+        C,
+        normalize_c=True,
+        weight_matrix_method="minus",
+        spatiotemporal=False,
+        apply_sqrt=True,
+        **kwargs,
+    ):
         """
         Implements the numerator of Moran's I (without normalization by variance or by W)
         NOTE: This only works for quadratic C
@@ -24,16 +32,25 @@ class MoransiLoss:
         if normalize_c:
             # normalize even before computing W -> leading to higher weights
             C = C / torch.max(C)
-        C = C.fill_diagonal_(1)  # needed to avoid zero division
-        if apply_sqrt:
-            W = 1 / torch.sqrt(C)  # actual weight construction w_ij = 1/c_ij
-        else:
-            W = 1 / C
-        W = W.fill_diagonal_(0)
 
-        # normalize to values betwen 0 and 1
-        if normalize_c:
-            W = W / torch.max(W)
+        if weight_matrix_method == "ratio":
+            C = C.fill_diagonal_(1)  # needed to avoid zero division
+            if apply_sqrt:
+                W = 1 / torch.sqrt(
+                    C
+                )  # actual weight construction w_ij = 1/c_ij
+            else:
+                W = 1 / C
+            W = W.fill_diagonal_(0)
+            # normalize to values betwen 0 and 1
+            if normalize_c:
+                W = W / torch.max(W)
+        elif weight_matrix_method == "minus":
+            W = C * (-1)
+        else:
+            raise NotImplementedError(
+                "weight_matrix_method must be in {minus, ratio}"
+            )
 
         # adapt size to batch dimension
         if W.dim() != 3:
@@ -67,4 +84,18 @@ class MoransiLoss:
         outer_product = torch.matmul(residuals_1, residuals_2)
 
         # multiply by c_ij and sum over i, j
-        return torch.sum(self.W * outer_product)
+        return torch.mean(self.W * outer_product)
+
+
+class MoransiCombinedLoss:
+    def __init__(self, C, spatiotemporal=False) -> None:
+        self.standard_mse = MSELoss()
+        self.moransi_error = MoransiLoss(C, spatiotemporal=spatiotemporal)
+        self.dist_weight = 1
+
+    def __call__(self, a_in, b_in):
+        mse_loss = self.standard_mse(a_in, b_in)
+        moransi_loss = self.moransi_error(a_in, b_in)
+        # for checking calibration of weighting
+        # print(mse_loss, self.dist_weight * moransi_loss)
+        return mse_loss + self.dist_weight * moransi_loss

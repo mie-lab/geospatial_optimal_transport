@@ -4,7 +4,7 @@ from geoemd.loss.sinkhorn_loss import SinkhornLoss
 import wasserstein
 
 
-class InterpretableUnbalancedOT:
+class PartialOT:
     def __init__(
         self,
         cost_matrix,
@@ -82,7 +82,7 @@ if __name__ == "__main__":
             [1.0, 0.5131642591866252, 0.28166962442054133, 0.0],
         ]
     )
-    ot_obj = InterpretableUnbalancedOT(test_cdist, compute_exact=True)
+    ot_obj = PartialOT(test_cdist, compute_exact=True)
     print(
         ot_obj(
             # torch.tensor([[1, 3, 2, 4], [1, 3, 2, 4]]),

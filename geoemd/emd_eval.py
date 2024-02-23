@@ -13,7 +13,7 @@ from geoemd.hierarchy.hierarchy_utils import (
 )
 from geoemd.utils import space_cost_matrix
 from geoemd.loss.sinkhorn_loss import SinkhornLoss
-from geoemd.loss.partial_ot import InterpretableUnbalancedOT
+from geoemd.loss.partial_ot import PartialOT
 from geoemd.config import SPEED_FACTOR
 
 """
@@ -191,8 +191,12 @@ class EMDWrapper:
 
         # Unbalanced OT is computed with different quantiles
         partial_ot_objects = []
-        quantile_range = [0] + np.arange(0.1, 1.1, 0.1).tolist() +  [1.5 * np.max(self.dist_matrix)]
-        names = ["quantile_"+str(i) for i in range(11)] + ["1.5max"]
+        quantile_range = (
+            [0]
+            + np.arange(0.1, 1.1, 0.1).tolist()
+            + [1.5 * np.max(self.dist_matrix)]
+        )
+        names = ["quantile_" + str(i) for i in range(11)] + ["1.5max"]
         penalty_mapping = {}
         for i in range(len(quantile_range)):
             if "quantile" in names[i]:
@@ -201,12 +205,14 @@ class EMDWrapper:
                 penalty = quantile_range[i]
             penalty_mapping[names[i]] = penalty
             # print(names[i], penalty)
-            partial_ot_objects.append(InterpretableUnbalancedOT(
-            self.dist_matrix,
-            compute_exact=True,
-            normalize_c=False,
-            penalty_unb=penalty,
-        ))
+            partial_ot_objects.append(
+                PartialOT(
+                    self.dist_matrix,
+                    compute_exact=True,
+                    normalize_c=False,
+                    penalty_unb=penalty,
+                )
+            )
         print(penalty_mapping)
 
         emd = []
@@ -244,16 +250,16 @@ class EMDWrapper:
             pred_tensor = torch.from_numpy(pred_vals).unsqueeze(0)
             sinkhorn_loss = sinkhorn(pred_tensor, gt_tensor)
 
-            base_dict =  {
-                    "EMD": emd_distance,
-                    "total_error": total_error,
-                    "MAE": np.mean(mae),
-                    "MSE": np.mean(mse),
-                    "Sinkhorn": sinkhorn_loss.item() * 10,
-                    "val_sample_ind": val_sample,
-                    "steps_ahead": steps_ahead,
-                }
-            
+            base_dict = {
+                "EMD": emd_distance,
+                "total_error": total_error,
+                "MAE": np.mean(mae),
+                "MSE": np.mean(mse),
+                "Sinkhorn": sinkhorn_loss.item() * 10,
+                "val_sample_ind": val_sample,
+                "steps_ahead": steps_ahead,
+            }
+
             # 4) unbalanced ot
             for i in range(len(names)):
                 unb_ot_res = partial_ot_objects[i](pred_tensor, gt_tensor)

@@ -4,11 +4,9 @@ import collections
 from scipy.spatial.distance import cdist
 import wasserstein
 
-from geoemd.loss.sinkhorn_loss import (
-    CombinedLoss,
-    SinkhornLoss,
-)
-from geoemd.loss.partial_ot import InterpretableUnbalancedOT
+from geoemd.loss.sinkhorn_loss import CombinedLoss, SinkhornLoss
+from geoemd.loss.moransi import MoransiCombinedLoss
+from geoemd.loss.partial_ot import PartialOT
 from geoemd.config import CONFIG, QUADRATIC_TIME, STEPS_AHEAD, FREQUENCY
 
 
@@ -161,37 +159,36 @@ def get_dataset_name(in_path_data: str) -> str:
 def get_emd_loss_function(loss_fn_argument: str, time_dist_matrix: np.ndarray):
     # make spatiotemporal cost matrix
     if "temporal" in loss_fn_argument:
-        spatiotemporal_cost = spacetime_cost_matrix(
+        cost_matrix = spacetime_cost_matrix(
             time_dist_matrix,
             time_steps=STEPS_AHEAD,
         )
-    if loss_fn_argument == "emdbalancedspatial":
-        return CombinedLoss(time_dist_matrix, mode="balancedSoftmax")
-    elif loss_fn_argument == "emdbalancedspatiotemporal":
-        # actually combined sinkhorn temporal
-        return CombinedLoss(
-            spatiotemporal_cost, spatiotemporal=True, mode="balancedSoftmax"
-        )
-    elif loss_fn_argument == "emdinterpretablespatial":
-        return InterpretableUnbalancedOT(
-            time_dist_matrix,
-            spatiotemporal=False,
-            penalty_unb=np.quantile(time_dist_matrix, 0.1),
-        )
-    elif loss_fn_argument == "emdunbalancedspatial":
-        return SinkhornLoss(
-            time_dist_matrix, mode="unbalanced", spatiotemporal=False
-        )
-        # training_kwargs["pl_trainer_kwargs"] = {"gradient_clip_val": 1}
-    elif loss_fn_argument == "emdunbalancedspatiotemporal":
-        return SinkhornLoss(
-            spatiotemporal_cost, mode="unbalanced", spatiotemporal=True
-        )
     else:
-        raise NotImplementedError(
-            "Must be emdbalancedspatial, emdunbalancedspatial,\
-                    emdunbalancedspatiotemporalor emdbalancedspatiotemporal"
-        )
+        cost_matrix = time_dist_matrix
+
+    loss_function_dict = {
+        "emdpartialspatial": PartialOT(
+            cost_matrix,
+            spatiotemporal=False,
+            penalty_unb=np.quantile(cost_matrix, 0.1),
+        ),
+        "emdsinkhornspatial": SinkhornLoss(
+            time_dist_matrix, mode="unbalanced", spatiotemporal=True
+        ),
+        "emdsinkhornspatiotemporal": SinkhornLoss(
+            time_dist_matrix, mode="unbalanced", spatiotemporal=False
+        ),
+        "emdmoransispatial": MoransiCombinedLoss(
+            cost_matrix, spatiotemporal=False
+        ),
+        "emdmoransispatiotemporal": MoransiCombinedLoss(
+            cost_matrix, spatiotemporal=False
+        ),
+        "emdbalancedspatial": CombinedLoss(
+            time_dist_matrix, mode="balancedSoftmax"
+        ),
+    }
+    return loss_function_dict[loss_fn_argument]
 
 
 def space_cost_matrix(
