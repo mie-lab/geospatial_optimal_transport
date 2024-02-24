@@ -3,7 +3,6 @@ import time
 import pandas as pd
 import numpy as np
 from scipy.spatial.distance import cdist
-import ot
 import torch
 
 from geoemd.hierarchy.hierarchy_utils import (

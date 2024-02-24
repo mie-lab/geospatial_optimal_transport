@@ -30,8 +30,8 @@ to_path_mapping = {
 }
 
 
-def load_stations(dataset):
-    station_path = STATION_PATH[dataset]
+def load_stations(dataset, base_data_path="data"):
+    station_path = os.path.join(base_data_path, STATION_PATH[dataset])
     return (
         pd.read_csv(station_path)
         .sort_values("station_id")
@@ -45,15 +45,17 @@ def compare_emd(
     emd_mode="station_to_station",
     split_by_fraction=True,
     out_path=None,
+    base_data_path="data",
 ):
     gt_reference = get_singlestations_file(path).drop("pred", axis=1)
     # load stations
-    stations = load_stations(DATASET)
+    stations = load_stations(DATASET, base_data_path)
     if filter_step > 0:
         gt_reference = gt_reference[gt_reference["steps_ahead"] == filter_step]
     # if we want to add the fraction, we need to load the raw training data
     if split_by_fraction:
-        data = pd.read_csv(DATA_PATH[DATASET])
+        data_path = os.path.join(base_data_path, DATA_PATH[DATASET])
+        data = pd.read_csv(data_path)
         # pivot
         if "station_id" in data.columns:
             data = data.pivot(
@@ -221,6 +223,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--name", required=True)
     parser.add_argument("-p", "--path", type=str, default="outputs")
+    parser.add_argument("-d", "--data_path", type=str, default="data")
     parser.add_argument(
         "--redo", action="store_true", help="for processing the results again"
     )
@@ -261,6 +264,7 @@ if __name__ == "__main__":
             filter_step=args.steps_ahead,
             emd_mode=args.mode,
             out_path=out_path,
+            base_data_path=args.data_path,
         )
         emd_results.to_csv(os.path.join(out_path, f"results.csv"), index=False)
     else:
