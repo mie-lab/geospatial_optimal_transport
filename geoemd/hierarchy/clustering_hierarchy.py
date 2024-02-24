@@ -76,6 +76,7 @@ class SpatialClustering:
         """demand_df: Dataframe with rows = timestamps and columns=station ids"""
         # merge with stations
         demand_df = demand_df_inp.swapaxes(1, 0)
+        demand_df.index = demand_df.index.astype(str)
         demand_df["cluster"] = self.stations["cluster"]
         if agg_func == "sum":
             demand_grouped = demand_df.groupby("cluster").sum()
