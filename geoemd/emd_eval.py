@@ -32,15 +32,13 @@ class EMDWrapper:
     def __init__(
         self,
         stations,
-        gt_reference,
+        gt_reference=None,
         res_hierarchy=None,
         quadratic_cost=False,
         mode="station_to_station",
     ):
         self.mode = mode
-        self.gt_reference = gt_reference.set_index(
-            ["val_sample_ind", "steps_ahead"]
-        ).rename({"group": "station"}, axis=1)
+        self.gt_reference = gt_reference
         self.stations = stations
         self.res_hierarchy = res_hierarchy
         assert self.stations.index.name == "station_id"
@@ -117,6 +115,9 @@ class EMDWrapper:
             raise ValueError("Invalid mode")
 
     def emd_station_to_station(self, res: pd.DataFrame) -> list:
+        self.gt_reference = self.gt_reference.set_index(
+            ["val_sample_ind", "steps_ahead"]
+        ).rename({"group": "station"}, axis=1)
         if self.res_hierarchy is None:
             # only possibility is station-to-station mode,
             # because there are no groups
@@ -160,6 +161,9 @@ class EMDWrapper:
         return coords_per_group
 
     def emd_group_to_station(self, res: pd.DataFrame) -> list:
+        self.gt_reference = self.gt_reference.set_index(
+            ["val_sample_ind", "steps_ahead"]
+        ).rename({"group": "station"}, axis=1)
         # predictions are just the per-group predictions
         res["pred_emd"] = res["pred"].copy()
         res["station"] = res["group"]

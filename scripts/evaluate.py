@@ -16,11 +16,13 @@ from geoemd.config import STATION_PATH, DATA_PATH, TRAINTEST_SPLIT
 from geoemd.hierarchy.hierarchy_utils import add_fraction_to_hierarchy
 
 
-def get_singlestations_file(path):
-    gt_file = [f for f in os.listdir(path) if "None" in f][0]
+def get_singlestations_file(path, emd_mode="station_by_station"):
+    single_statio_file_list = [f for f in os.listdir(path) if "None" in f]
+    if len(single_statio_file_list) == 0:
+        return None
     # load gt as reference (per station gt needed for evaluation)
-    gt_reference = pd.read_csv(os.path.join(path, gt_file))
-    return gt_reference
+    gt_reference = pd.read_csv(os.path.join(path, single_statio_file_list[0]))
+    return gt_reference.drop("pred", axis=1)
 
 
 to_path_mapping = {
@@ -47,11 +49,12 @@ def compare_emd(
     out_path=None,
     base_data_path="data",
 ):
-    gt_reference = get_singlestations_file(path).drop("pred", axis=1)
+    gt_reference = get_singlestations_file(path)
+    assert gt_reference is not None or emd_mode == "group_to_group"
+    if filter_step > 0 and gt_reference is not None:
+        gt_reference = gt_reference[gt_reference["steps_ahead"] == filter_step]
     # load stations
     stations = load_stations(DATASET, base_data_path)
-    if filter_step > 0:
-        gt_reference = gt_reference[gt_reference["steps_ahead"] == filter_step]
     # if we want to add the fraction, we need to load the raw training data
     if split_by_fraction:
         data_path = os.path.join(base_data_path, DATA_PATH[DATASET])
@@ -77,7 +80,7 @@ def compare_emd(
         print(f[:-4])
         # load file
         res = pd.read_csv(os.path.join(path, f))
-        assert (
+        assert gt_reference is None or (
             res.iloc[0]["val_sample_ind"]
             == gt_reference.iloc[0]["val_sample_ind"]
         ), "GT samples do not correspond to pred samples"
