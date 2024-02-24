@@ -23,6 +23,13 @@ def get_singlestations_file(path):
     return gt_reference
 
 
+to_path_mapping = {
+    "station_to_station": "sts",
+    "group_to_group": "gtg",
+    "group_to_station": "gts",
+}
+
+
 def load_stations(dataset):
     station_path = STATION_PATH[dataset]
     return (
@@ -240,7 +247,9 @@ if __name__ == "__main__":
     out_plot_name = (
         "plots" if args.steps_ahead == -1 else "plots" + str(args.steps_ahead)
     )
-    out_path = os.path.join(args.path, comp + "_" + out_plot_name)
+    out_path = os.path.join(
+        args.path, f"{comp}_{to_path_mapping[args.mode]}_{out_plot_name}"
+    )
     os.makedirs(out_path, exist_ok=True)
 
     DATASET = get_dataset_name(comp)
