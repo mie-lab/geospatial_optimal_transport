@@ -37,10 +37,14 @@ class SinkhornLoss:
         # modified later to match the batch size
         self.cost_matrix = C.to(device)
         self.cost_matrix_original = self.cost_matrix.clone()
-        self.dummy_locs = torch.tensor(
+        self.dummy_weights_alpha = torch.tensor(
+            [[[i] for i in range(C.size()[-2])]]
+        ).float()
+        self.dummy_weights_beta = torch.tensor(
             [[[i] for i in range(C.size()[-1])]]
         ).float()
-        self.dummy_locs_orig = self.dummy_locs.clone()
+        self.dummy_weights_a = self.dummy_weights_alpha.clone()
+        self.dummy_weights_b = self.dummy_weights_beta.clone()
 
         # sinkhorn loss
         self.loss_object = geomloss.SamplesLoss(
@@ -62,7 +66,12 @@ class SinkhornLoss:
             self.cost_matrix = self.cost_matrix_original.repeat(
                 (batch_size, 1, 1)
             )
-            self.dummy_locs = self.dummy_locs_orig.repeat((batch_size, 1, 1))
+            self.dummy_weights_a = self.dummy_weights_alpha.repeat(
+                (batch_size, 1, 1)
+            )
+            self.dummy_weights_b = self.dummy_weights_beta.repeat(
+                (batch_size, 1, 1)
+            )
 
     def __call__(self, a_in, b_in):
         """a_in: predictions, b_in: targets"""
@@ -104,7 +113,9 @@ class SinkhornLoss:
             a = a / torch.unsqueeze(torch.sum(a, dim=-1), -1)
             b = b / torch.unsqueeze(torch.sum(b, dim=-1), -1)
 
-        loss = self.loss_object(a, self.dummy_locs, b, self.dummy_locs)
+        loss = self.loss_object(
+            a, self.dummy_weights_a, b, self.dummy_weights_b
+        )
         # DEBUG:
         # if torch.any(loss < 0):
         #     import pickle
