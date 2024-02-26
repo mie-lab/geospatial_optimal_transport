@@ -1,3 +1,4 @@
+import os
 import json
 import pandas as pd
 import numpy as np
@@ -13,6 +14,7 @@ class SpatialClustering:
     def __init__(self, in_path_stations: str, is_cost_matrix: bool = False):
         # load stations or cost matrix -> both have a column station_id that we
         # will set as the index.
+        self.in_path_stations = in_path_stations
         self.stations = pd.read_csv(in_path_stations).set_index("station_id")
         self.stations.index = self.stations.index.astype(str)
         # indicate whether the stations are a dataframe or directly a cost matrix
@@ -33,12 +35,31 @@ class SpatialClustering:
     def __call__(self, clustering_method="kmeans", n_clusters=10):
         if self.is_cost_matrix:
             cluster_labels = self.cluster_spectral(n_clusters=n_clusters)
-        else:
+        elif "quartier" in clustering_method:
+            assert (
+                clustering_method
+                in ["quartierhabitation", "quartiersociologic"]
+                and "bike" in self.in_path_stations
+            ), "Not implemented"
+            in_path_quartiers = os.path.join(
+                *self.in_path_stations.split(os.sep)[:-1], "quartiers.csv"
+            )
+            quartier_dict = (
+                pd.read_csv(in_path_quartiers)
+                .set_index("station_id")[clustering_method]
+                .to_dict()
+            )
+            cluster_labels = [
+                quartier_dict[int(sid)] for sid in self.stations.index
+            ]
+        elif clustering_method in ["kmeans", "agg"]:
             cluster_class = clustering_dict[clustering_method](
                 n_clusters=n_clusters
             )
             cluster_class.fit(self.stations[["x", "y"]])
             cluster_labels = cluster_class.labels_
+        else:
+            raise NotImplementedError("clustering method not available")
         self.stations["cluster"] = cluster_labels
         self.stations["cluster"] = "Group_" + self.stations["cluster"].astype(
             str
