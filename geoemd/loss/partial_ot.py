@@ -24,11 +24,11 @@ class PartialOT:
         self.norm_sum_1 = norm_sum_1
         if penalty_unb == "max":
             penalty_unb = np.max(cost_matrix)
-        clen = len(cost_matrix)
-        extended_cost_matrix = np.zeros((clen + 1, clen + 1))
-        extended_cost_matrix[:clen, :clen] = cost_matrix
+        clen, cwid = cost_matrix.shape
+        extended_cost_matrix = np.zeros((clen + 1, cwid + 1))
+        extended_cost_matrix[:clen, :cwid] = cost_matrix
         extended_cost_matrix[clen, :] = penalty_unb
-        extended_cost_matrix[:, clen] = penalty_unb
+        extended_cost_matrix[:, cwid] = penalty_unb
 
         if normalize_c:
             extended_cost_matrix = extended_cost_matrix / np.max(
