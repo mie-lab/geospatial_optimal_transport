@@ -235,6 +235,7 @@ class EMDWrapper:
             gt_vals_normed = gt_vals / np.sum(gt_vals) * np.sum(pred_vals)
 
             # compute base error metrics
+            # NOTE: if gts mode, then MSE if computed as gtg!
             mae = (sample_df["pred"] - sample_df["gt"]).abs()
             mse = mae**2
 

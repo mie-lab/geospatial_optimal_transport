@@ -42,7 +42,7 @@ python train_test.py [-h] [-d DATA_PATH] [-s STATION_PATH] [-o OUT_PATH] [-c CON
 E.g. we ran it with 
 
 ```
-python scripts/train_test.py  -d data/bikes/test_pickup.csv     -s data/bikes/test_stations.csv     -o outputs/bikes     --model_path trained_models/bikes  --model nhits --n_epochs 100 --x_loss_function emdunbalancedspatial
+python scripts/train_test.py  -d data/bikes/test_pickup.csv     -s data/bikes/test_stations.csv     -o outputs/bikes     --model_path trained_models/bikes  --model nhits --n_epochs 100 --x_loss_function emdpartialspatial
 ```
 This will train with a Sinkhorn loss (unbalanced OT) in the NHiTS model, and will save the model in the folder `trained_models/bikes`, and save the output in `outputs/bikes`.
 

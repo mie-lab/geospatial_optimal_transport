@@ -103,7 +103,10 @@ class ModelWrapper:
         # set model class and model kwargs
         if model_class == "linear":
             ModelClass = LinearRegressionModel
-            model_kwargs = {"lags": self.model_args["lags"]}
+            model_kwargs = {
+                "lags": self.model_args["lags"],
+                "fit_intercept": False,
+            }
         elif model_class == "nhits":
             ModelClass = NHiTSModel
             model_kwargs = {
