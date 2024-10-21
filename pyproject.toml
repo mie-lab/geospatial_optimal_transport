@@ -15,7 +15,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 keywords = ["geographic", "geospatial", "optimal transport", "spatiotemporal", "metrics", "evaluation"]
-dependencies = ["torch", "geomloss", "numpy", "pytest", "wasserstein", "scipy", "matplotlib", "pandas", "POT", "notebook", "darts"]
+dependencies = ["torch", "geomloss", "numpy", "pytest", "wasserstein", "scipy", "matplotlib", "pandas", "POT", "notebook", "darts", "seaborn", "scikit-learn", "libpysal", "esda", "geomloss"]
 
 [tool.setuptools.packages]
 find = {}
