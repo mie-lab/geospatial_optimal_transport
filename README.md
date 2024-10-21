@@ -53,3 +53,13 @@ Our evaluation script is applied on a whole folder with the outputs from several
 ```
 python scripts/evaluate.py -n bikes --redo 
 ```
+
+## Reproduce results
+
+We provide notebooks to reproduce all figures and tables from the manuscript:
+
+* [synthetic](notebooks/synthetic_example.ipynb): This notebook provides the code for reproducing the experiments on synthetic data, including Figure 3 and Figure 4.
+* [case study bike sharing](notebooks/bike_sharing_case_study.ipynb): Reproducing experiments on the application of the evaluation framework on bike sharing data (Figure 5, 6 and 7)
+* [unpaired](notebooks/unpaired_ot.ipynb): This notebook reproduces the experiment in Appendix B (OT for unpaired data).
+* [scales](notebooks/scales.ipynb): Reproduce the analysis on spatial and temporal scales (Figure 8, Table 2, Appendix F)
+* [sinkhorn loss](notebooks/sinkhorn_loss.ipynb): Reproduce the results of training with the Sinkhorn loss with this notebook (Table 3, Figure 11) as well as the analysis in Appendix D

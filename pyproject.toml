@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geoemd"
+version = "0.1.0"
+description = "Optimal Transport metrics for evaluating spatiotemporal predictions"
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+keywords = ["geographic", "geospatial", "optimal transport", "spatiotemporal", "metrics", "evaluation"]
+dependencies = ["torch", "geomloss", "numpy", "pytest", "wasserstein", "scipy", "matplotlib", "pandas", "POT", "notebook", "darts"]
+
+[tool.setuptools.packages]
+find = {}
