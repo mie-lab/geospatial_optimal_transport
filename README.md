@@ -49,7 +49,7 @@ python preprocessing/traffic.py
 ### Training models
 
 -----------------
-**NOTE**: The purpose of this repo is to demonstrate an *evaluation* framework. The goal is not to develop **new** superior models for bike sharing or other applications. Thus, the predictions themselves do not matter much and were only created to demonstrate the framework on new data. We provide our outputs [here](data_submission/predictions/). The following instructions are only necessary to retrain the models.
+**NOTE**: The purpose of this repo is to demonstrate an *evaluation* framework. The goal is not to develop **new** superior models for bike sharing or other applications. Thus, the predictions themselves do not matter much and were mainly created to demonstrate the framework on realistic data. We provide our outputs [here](data_submission/predictions/). The following instructions are only necessary to retrain the models.
 
 -----------------
 
@@ -74,9 +74,9 @@ Our evaluation script is applied on a whole folder with the outputs from several
 python scripts/evaluate.py -n bikes --redo 
 ```
 
-## Reproduce results
+## Reproduce results from the paper
 
-We provide notebooks to reproduce all figures and tables from the manuscript:
+We provide notebooks to reproduce all figures and tables from the manuscript. These notebooks can be run without any previous steps, just using the data in `data_submission`.
 
 * [synthetic](notebooks/synthetic_example.ipynb): This notebook provides the code for reproducing the experiments on synthetic data, including Figure 3 and Figure 4.
 * [case study bike sharing](notebooks/bike_sharing_case_study.ipynb): Reproducing experiments on the application of the evaluation framework on bike sharing data (Figure 5, 6 and 7)
