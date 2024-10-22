@@ -12,9 +12,15 @@ python -m venv env
 source env/bin/activate
 pip install -e .
 ```
-This installs the package called `geoemd` in your virtual environment, together with all dependencies. 
+This installs the package called `geoemd` in your virtual environment, together with all dependencies. The code was tested on OS and Linux. 
 
 ### Data download and preprocessing:
+
+We provide all preprocessed data in the [data_submission](data_submission/) folder. 
+
+If you want to reproduce the preprocessing, please use the following instructions:
+
+**1) Bike sharing data**
 
 Public bike sharing data from Montreal were downloaded [here](https://www.kaggle.com/datasets/aubertsigouin/biximtl). A script is provided to read all data and to convert it into the hourly number of bike pick-ups per station:
 
@@ -24,14 +30,28 @@ python preprocessing/bikes_montreal.py --path path/to/downloaded/folder
 
 The script will output the preprocessed data into the same folder.
 
-Similarly, we provide a preprocessing script for the charging data (downloaded here: https://gitlab.com/smarter-mobility-data-challenge/tutorials); however, it builds up on the [notebook]( https://github.com/arthur-75/Smarter-Mobility-Data-Challenge/blob/main/notebook/cleaning.ipynb) from the winning team of the challenge:
+**2) Charging occupancy data**
 
+The charging station occupancy data were downloaded [here](here: https://gitlab.com/smarter-mobility-data-challenge/tutorials). It is taken from the `Smarter Mobility Data Challenge` (see [paper](https://arxiv.org/abs/2306.06142v1)). 
 
+We first run the data through the [notebook]( https://github.com/arthur-75/Smarter-Mobility-Data-Challenge/blob/main/notebook/cleaning.ipynb) from the winning team of the challenge for preprocessing. We then saved the intermediate data and run it through the following script for further preprocessing steps (paths are hard-coded in the script):
 ```
 python preprocessing/charging.py
 ```
 
-### Train and test a model
+**3) Traffic forecasting data**
+
+Data was downloaded [here](https://github.com/MengzhangLI/STFGNN/tree/master/data/PEMS08). We save the data in a folder `data/traffic`. Then, we preprocess it through the following script:
+```
+python preprocessing/traffic.py
+```
+
+### Training models
+
+-----------------
+**NOTE**: The purpose of this repo is to demonstrate an *evaluation* framework. The goal is not to develop **new** superior models for bike sharing or other applications. Thus, the predictions themselves do not matter much and were only created to demonstrate the framework on new data. We provide our outputs [here](data_submission/predictions/). The following instructions are only necessary to retrain the models.
+
+-----------------
 
 We use the `darts` library for time series prediction.
 
@@ -42,7 +62,7 @@ python train_test.py [-h] [-d DATA_PATH] [-s STATION_PATH] [-o OUT_PATH] [-c CON
 E.g. we ran it with 
 
 ```
-python scripts/train_test.py  -d data/bikes/test_pickup.csv     -s data/bikes/test_stations.csv     -o outputs/bikes     --model_path trained_models/bikes  --model nhits --n_epochs 100 --x_loss_function emdpartialspatial
+python scripts/train_test.py  -d data_submission/data_raw/bikes_data.csv     -s data_submission/data_raw/bikes_stations.csv    -o outputs/bikes     --model_path trained_models/bikes  --model nhits --n_epochs 100 --x_loss_function emdpartialspatial
 ```
 This will train with a Sinkhorn loss (unbalanced OT) in the NHiTS model, and will save the model in the folder `trained_models/bikes`, and save the output in `outputs/bikes`.
 

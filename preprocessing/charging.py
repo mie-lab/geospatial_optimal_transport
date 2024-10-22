@@ -23,12 +23,12 @@ train_merged = train_cleaned.merge(
 )
 
 # fill nans in the raw data with the preprocessed data where NaNs are filled
-train_merged.loc[
-    ~pd.isna(train_merged["Charging"]), "Charging_f_m"
-] = train_merged.loc[~pd.isna(train_merged["Charging"]), "Charging"]
-train_merged.loc[
-    ~pd.isna(train_merged["Passive"]), "Passive_f_m"
-] = train_merged.loc[~pd.isna(train_merged["Passive"]), "Passive"]
+train_merged.loc[~pd.isna(train_merged["Charging"]), "Charging_f_m"] = (
+    train_merged.loc[~pd.isna(train_merged["Charging"]), "Charging"]
+)
+train_merged.loc[~pd.isna(train_merged["Passive"]), "Passive_f_m"] = (
+    train_merged.loc[~pd.isna(train_merged["Passive"]), "Passive"]
+)
 
 # Here: "count" corresponds to the occupied charging stations
 train_merged["count"] = (
@@ -65,6 +65,6 @@ stations.to_csv("data/charging/stations.csv", index=False)
 # make a subset for tuning:
 data = pd.read_csv("data/charging/data.csv")
 data["timeslot"] = pd.to_datetime(data["timeslot"])
-corona_date = datetime.strptime("2020-10-18 00:00:00", '%Y-%m-%d %H:%M:%S')
+corona_date = datetime.strptime("2020-10-18 00:00:00", "%Y-%m-%d %H:%M:%S")
 test_data = data[data["timeslot"] > corona_date]
 test_data.to_csv("data/charging/test_data.csv", index=False)

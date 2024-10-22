@@ -60,19 +60,19 @@ CONFIG = {
 
 
 STATION_PATH = {
-    "bikes": "bikes/test_stations.csv",
+    "bikes": "data_submission/data_raw/bikes_stations.csv",
     "bikes_2015": "bikes/stations_2015.csv",
     "carsharing": "carsharing/zurich_stations.csv",
-    "charging": "charging/stations.csv",
-    "traffic": "traffic/cost.csv",
+    "charging": "data_submission/data_raw/charging_stations.csv",
+    "traffic": "data_submission/data_raw/traffic_cost.csv",
 }
 
 DATA_PATH = {
-    "bikes": "bikes/test_pickup.csv",
+    "bikes": "data_submission/data_raw/bikes_data.csv",
     "bikes_2015": "bikes/data_2015.csv",
     "carsharing": "carsharing/zurich_data.csv",
-    "charging": "charging/test_data.csv",
-    "traffic": "traffic/data.csv",
+    "charging": "data_submission/data_raw/charging_data.csv",
+    "traffic": "data_submission/data_raw/traffic_data.csv",
 }
 
 FREQUENCY = {
