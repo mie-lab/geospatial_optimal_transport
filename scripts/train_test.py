@@ -16,7 +16,6 @@ from geoemd.utils import (
     space_cost_matrix,
 )
 from geoemd.io import load_time_series_data, load_stations
-from geoemd.parameter_optimization import OptunaOptimizer
 from geoemd.loss.distribution_loss import StepwiseCrossentropy, DistributionMSE
 from geoemd.config import (
     STEPS_AHEAD,
@@ -28,6 +27,13 @@ from geoemd.config import (
     FREQUENCY,
 )
 import warnings
+
+try:
+    from geoemd.parameter_optimization import OptunaOptimizer
+except ImportError:
+    warnings.warn(
+        "Optuna not installed, please install if you want to tune parameters"
+    )
 
 DEBUG = False
 warnings.filterwarnings("ignore")

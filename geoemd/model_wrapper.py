@@ -3,7 +3,6 @@ import torchmetrics
 import torch
 from darts.models import (
     LinearRegressionModel,
-    XGBModel,
     NHiTSModel,
     ExponentialSmoothing,
     LightGBMModel,
@@ -133,9 +132,6 @@ class ModelWrapper:
             model_kwargs = {
                 "lags": self.model_args["lags"],
             }
-        elif model_class == "xgb":
-            ModelClass = XGBModel
-            model_kwargs = {"lags": self.model_args["lags"]}
         elif model_class == "laststep":
             ModelClass = LastStepModel
             model_kwargs = {}

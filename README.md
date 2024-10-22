@@ -8,8 +8,8 @@ The code can be installed via pip in editable mode in a virtual environment with
 ```
 git clone https://github.com/mie-lab/geospatial_optimal_transport
 cd  geospatial_optimal_transport
-python -m venv env
-source env/bin/activate
+conda create -n otenv python=3.9
+conda activate otenv
 pip install -e .
 ```
 This installs the package called `geoemd` in your virtual environment, together with all dependencies. The code was tested on OS and Linux. 
@@ -83,3 +83,8 @@ We provide notebooks to reproduce all figures and tables from the manuscript:
 * [unpaired](notebooks/unpaired_ot.ipynb): This notebook reproduces the experiment in Appendix B (OT for unpaired data).
 * [scales](notebooks/scales.ipynb): Reproduce the analysis on spatial and temporal scales (Figure 8, Table 2, Appendix F)
 * [sinkhorn loss](notebooks/sinkhorn_loss.ipynb): Reproduce the results of training with the Sinkhorn loss with this notebook (Table 3, Figure 11) as well as the analysis in Appendix D
+
+
+### Troubleshooting
+
+* Sometimes XGB within the darts library causes issues. XGB is not used in this repo, so as a hot fix, the import in `site-packages/darts/models/__init__.py` can be removed to ignore the issue.
