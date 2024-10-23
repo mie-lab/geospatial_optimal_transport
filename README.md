@@ -1,4 +1,4 @@
-# Earth mover distance for spatiotemporal predictions
+# GeOT: A spatially explicit framework for evaluating spatio-temporal predictions
 
 
 ### Installation:
