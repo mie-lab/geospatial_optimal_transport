@@ -79,9 +79,10 @@ python scripts/evaluate.py -n bikes --redo
 We provide notebooks to reproduce all figures and tables from the manuscript. These notebooks can be run without any previous steps, just using the data in `data_submission`.
 
 * [synthetic](notebooks/synthetic_example.ipynb): This notebook provides the code for reproducing the experiments on synthetic data, including Figure 3 and Figure 4.
-* [case study bike sharing](notebooks/bike_sharing_case_study.ipynb): Reproducing experiments on the application of the evaluation framework on bike sharing data (Figure 5, 6 and 7)
-* [scales](notebooks/scales.ipynb): Reproduce the analysis on spatial and temporal scales (Figure 8, Table 2, Appendix F)
-* [sinkhorn loss](notebooks/sinkhorn_loss.ipynb): Reproduce the results of training with the Sinkhorn loss with this notebook (Table 3, Figure 11) as well as the analysis in Appendix D
+* [case study bike sharing](notebooks/bike_sharing_case_study.ipynb): Reproducing case study where the evaluation framework is applied on bike sharing data (Figure 5 and Figure 6)
+* [case study spatial regression](notebooks/spatial_regression.ipynb): Reproducing case study on spatial regression (Table 3 and Figure 9)
+* [scales](notebooks/scales.ipynb): Reproduce the analysis on spatial and temporal scales (Figure 7 and Table 2)
+* [sinkhorn loss](notebooks/sinkhorn_loss.ipynb): Reproduce the results of training with the Sinkhorn loss with this notebook (Table 4 and Figure 11) as well as the analysis in Appendix D
 
 To reproduce the experiments on spatial regression (section 5), first run
 ```
